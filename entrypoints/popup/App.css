@@ -1,0 +1,29 @@
+#root { width: 100%; }
+.app-shell { width: 360px; min-height: 520px; padding: 22px; box-sizing: border-box; }
+.topbar, .footer-row, .actions { display: flex; align-items: center; }
+.topbar { gap: 10px; margin-bottom: 20px; }
+.brand-mark { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 12px; color: #241a0d; background: #f5b942; font-size: 24px; font-weight: 900; transform: rotate(-8deg); }
+.topbar h1 { margin: 0; font-size: 20px; letter-spacing: -0.04em; }
+.eyebrow { margin: 0 0 2px; color: #9d927f; font-size: 9px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.status-dot { width: 8px; height: 8px; margin-left: auto; border-radius: 50%; background: #83d69a; box-shadow: 0 0 0 4px #83d69a22; }
+.intervention { padding: 24px 20px 20px; border: 1px solid #ffffff10; border-radius: 22px; background: linear-gradient(150deg, #30261b, #211b15); box-shadow: 0 18px 38px #00000030; }
+.wallet { margin-bottom: 18px; font-size: 54px; line-height: 1; transform: rotate(-8deg); }
+.warning { color: #f5b942; }
+.intervention h2 { margin: 8px 0 10px; font-size: 27px; line-height: 1.05; letter-spacing: -0.055em; }
+.message { margin: 0; color: #d1c5b3; font-size: 14px; line-height: 1.5; }
+.message strong { color: #fff1ce; }
+.insight { display: grid; gap: 3px; margin: 22px 0; padding: 14px; border: 1px solid #f5b9422b; border-radius: 14px; background: #f5b9420d; }
+.insight span, .insight small { color: #aa9c89; font-size: 11px; }
+.insight strong { color: #f5b942; font-size: 27px; letter-spacing: -.04em; }
+.insight small { color: #d1c5b3; }
+.actions { flex-direction: column; gap: 8px; }
+button { width: 100%; border: 0; border-radius: 10px; padding: 12px 14px; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+.primary { color: #241a0d; background: #f5b942; }
+.secondary { color: #aa9c89; background: transparent; }
+.secondary:hover { color: #fff1ce; background: #ffffff08; }
+.footer-row { gap: 8px; margin-top: 18px; color: #aa9c89; font-size: 11px; }
+.privacy { margin-left: auto; color: #83d69a; }
+.toggle { width: 28px; height: 16px; padding: 2px; background: #554a3c; }
+.toggle span { display: block; width: 12px; height: 12px; border-radius: 50%; background: #aa9c89; transition: transform .2s; }
+.toggle.on { background: #527f5d; }
+.toggle.on span { background: #c8f4cf; transform: translateX(12px); }
