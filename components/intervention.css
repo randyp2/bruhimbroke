@@ -1,0 +1,34 @@
+:host { all: initial; }
+dialog {
+  box-sizing: border-box; width: min(440px, calc(100vw - 24px));
+  max-height: calc(100dvh - 32px); overflow: auto; margin: auto;
+  padding: 0; border: 1px solid #5d4931; border-radius: 24px;
+  color: #fff1ce; background: #211b15;
+  box-shadow: 0 24px 100px #0009; font: 15px/1.5 system-ui, sans-serif;
+  color-scheme: dark;
+}
+dialog::backdrop { background: #000a; backdrop-filter: blur(3px); }
+.pause { position: relative; padding: 28px; }
+.eyebrow { padding-right: 26px; color: #f5b942; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; }
+h1 { margin: 12px 0; font-size: 30px; line-height: 1.1; letter-spacing: -.04em; }
+p { margin: 12px 0; }
+label { display: grid; gap: 5px; margin-top: 14px; color: #e4d7c4; font-size: 13px; }
+input { box-sizing: border-box; width: 100%; padding: 11px; border: 1px solid #8b7659; border-radius: 10px; background: #18130f; color: #fff1ce; font: inherit; }
+input[aria-invalid="true"] { border-color: #ffae9b; }
+small { display: block; margin-top: 8px; color: #c4b7a4; font-size: 12px; }
+button { border: 1px solid transparent; border-radius: 10px; padding: 12px; font: 600 14px system-ui, sans-serif; cursor: pointer; }
+button:disabled { opacity: .6; cursor: default; }
+button:focus-visible, input:focus-visible { outline: 3px solid #f5b942; outline-offset: 3px; }
+.close { position: absolute; top: 12px; right: 12px; font-size: 24px; padding: 2px 12px; background: transparent; color: #fff1ce; }
+.primary { color: #241a0d; background: #f5b942; }
+.secondary { color: #fff1ce; background: #ffffff0a; border-color: #8b7659; }
+.actions { display: grid; gap: 10px; margin: 20px 0 10px; }
+.insight { padding: 14px; margin: 18px 0; background: #f5b9420d; border: 1px solid #f5b94240; border-radius: 12px; }
+[role="alert"] { color: #ffae9b; }
+[role="status"] { color: #b1e6b9; }
+.mascot { position: relative; display: inline-block; font-size: 56px; line-height: 1.3; animation: wobble .7s ease-in-out 2; }
+.mascot span { position: absolute; right: -15px; top: 0; font: 900 28px system-ui; color: #f5b942; }
+.mascot.dramatic { transform: rotate(-18deg); }
+@keyframes wobble { 25% { transform: rotate(-12deg); } 75% { transform: rotate(12deg); } }
+@media (prefers-reduced-motion: reduce) { .mascot { animation: none; } }
+.notice { position: fixed; bottom: 20px; right: 20px; max-width: min(340px, calc(100vw - 40px)); padding: 16px; border-radius: 12px; color: #fff1ce; background: #211b15; border: 1px solid #f5b942; font: 14px/1.5 system-ui; box-shadow: 0 8px 30px #0006; }

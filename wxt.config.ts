@@ -5,6 +5,6 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   manifest: {
     name: 'BruhImBroke',
-    permissions: ['storage'],
+    permissions: ['storage', 'activeTab', 'scripting'],
   },
 });

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import './App.css';
+import { ShoppingHome } from './ShoppingHome';
 
 type FinancialSituation = 'raise' | 'new-job' | 'improved' | 'no-change';
 
@@ -49,7 +50,7 @@ function App() {
     return <main className="app-shell loading" aria-label="Loading BruhImBroke"><div className="loading-mark">$</div><p>Checking your financial situation...</p></main>;
   }
 
-  return onboarding ? <Intervention /> : <Onboarding onComplete={setOnboarding} />;
+  return onboarding ? <ShoppingHome /> : <Onboarding onComplete={setOnboarding} />;
 }
 
 function Onboarding({ onComplete }: { onComplete: (data: OnboardingData) => void }) {
@@ -58,13 +59,13 @@ function Onboarding({ onComplete }: { onComplete: (data: OnboardingData) => void
   const [monthlyIncomeIncrease, setMonthlyIncomeIncrease] = useState('');
   const [trackingEnabled, setTrackingEnabled] = useState(true);
 
-  const finish = async () => {
+  const finish = async (tracking = trackingEnabled) => {
     if (!situation) return;
 
     const data: OnboardingData = {
       situation,
       monthlyIncomeIncrease: monthlyIncomeIncrease ? Number(monthlyIncomeIncrease) : null,
-      trackingEnabled,
+      trackingEnabled: tracking,
     };
     await new Promise<void>((resolve, reject) => {
       extensionChrome.storage.local.set({ [STORAGE_KEY]: data }, () => {
@@ -129,15 +130,15 @@ function Onboarding({ onComplete }: { onComplete: (data: OnboardingData) => void
           <div className="onboarding-emoji" aria-hidden="true">🧾</div>
           <p className="eyebrow warning">STEP 3 OF 3</p>
           <h2 id="step-three-title">Want help spotting the pattern?</h2>
-          <p className="message">We can save purchases you explicitly confirm. Everything stays on this device, and we never assume a click was a purchase.</p>
+          <p className="message">Your final “Log my purchase” confirmation saves a purchase immediately, even before checkout finishes. If you change your mind, edit or delete it in Shopping history. Everything stays on this device.</p>
           <button className={`tracking-choice ${trackingEnabled ? 'selected' : ''}`} type="button" aria-pressed={trackingEnabled} onClick={() => setTrackingEnabled((enabled) => !enabled)}>
             <span className="choice-icon">✓</span>
-            <span><strong>Track confirmed purchases</strong><small>Build a private spending history</small></span>
+            <span><strong>Save shopping history</strong><small>Log purchases on your final confirmation</small></span>
             <span className="choice-check">{trackingEnabled ? 'ON' : 'OFF'}</span>
           </button>
           <div className="actions step-actions">
-            <button className="primary" type="button" onClick={finish}>Finish setup</button>
-            <button className="secondary" type="button" onClick={() => { setTrackingEnabled(false); void finish(); }}>Skip tracking</button>
+            <button className="primary" type="button" onClick={() => void finish()}>Finish setup</button>
+            <button className="secondary" type="button" onClick={() => void finish(false)}>Skip tracking</button>
           </div>
         </section>
       )}
@@ -149,15 +150,6 @@ function Onboarding({ onComplete }: { onComplete: (data: OnboardingData) => void
 
 function Choice({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
   return <button className={`choice ${selected ? 'selected' : ''}`} type="button" aria-pressed={selected} onClick={onClick}><span>{label}</span><span className="choice-check">{selected ? '✓' : ''}</span></button>;
-}
-
-function Intervention() {
-  return (
-    <main className="app-shell">
-      <header className="topbar"><div className="brand-mark" aria-hidden="true">$</div><div><p className="eyebrow">Financial intervention unit</p><h1>BruhImBroke</h1></div><span className="status-dot" title="BruhImBroke is active" /></header>
-      <section className="intervention" aria-labelledby="intervention-title"><div className="wallet" aria-hidden="true">👛</div><p className="eyebrow warning">INCOMING PURCHASE</p><h2 id="intervention-title">Hold on. We need to talk.</h2><p className="message">You are really about to spend <strong>$140</strong> on headphones? Your bank account has requested an emergency meeting.</p><div className="insight"><span>Monthly shopping so far</span><strong>$870</strong><small>Demo insight: that is 89% of your imaginary raise.</small></div><div className="actions"><button className="primary" type="button">Okay, I’ll think about it</button><button className="secondary" type="button">I’m buying it anyway</button></div></section>
-    </main>
-  );
 }
 
 export default App;
