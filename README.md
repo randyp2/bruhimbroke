@@ -23,6 +23,12 @@ The build folder is `.output/chrome-mv3`; `npm run dev` uses
 
 ## Try the shopping flow
 
+After onboarding, the main menu is a dark landscape stage with the professor.
+The three dots under him preview happy, questionable, and sad expressions.
+Use **History & tools** in the header to access all existing history controls
+and **Check this page**. Press Escape or toggle the header control to close it.
+The expressions are visual previews, not a spending score.
+
 1. Complete onboarding. Enable shopping history to save purchases and reminders.
 2. Refresh an Amazon.com product page and click its main **Add to Cart** or
    **Buy Now** button. The cart's **Proceed to checkout** control is also covered.
@@ -85,6 +91,8 @@ immediate purchase logging, manual corrections, confirmation, deletion, tracking
 opt-out, exclusions, and storage failures.
 Native modal, focus containment, Escape, and real mouse continuation were also
 smoke-tested in isolated Chrome on a local fixture, with simulated storage.
+The 720 × 460 main menu, sprite loading, expression previews, tools panel bounds,
+and Escape navigation were also checked in isolated Chrome with simulated storage.
 Live signed-in checkout compatibility still needs manual verification.
 
 See [retailer research and selector decisions](docs/retailer-notes.md).

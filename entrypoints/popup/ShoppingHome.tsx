@@ -2,6 +2,15 @@ import { useEffect, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { shoppingData } from '../../lib/purchases';
 import { HistoryEntry } from './HistoryEntry';
+import happyProfessor from '../../assets/prof-happy-cutout.png';
+import sadProfessor from '../../assets/prof-sad-cutout.png';
+import questionableProfessor from '../../assets/prof-questionable-cutout.png';
+
+const expressions = [
+  { label: 'Happy', image: happyProfessor },
+  { label: 'Questionable', image: questionableProfessor },
+  { label: 'Sad', image: sadProfessor },
+];
 
 /** Starts user-initiated checks and records purchases only after explicit confirmation. */
 export function ShoppingHome() {
@@ -10,6 +19,7 @@ export function ShoppingHome() {
   const [opening, setOpening] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [expression, setExpression] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -69,33 +79,52 @@ export function ShoppingHome() {
     }
   }
 
-  return <main className="app-shell">
-    <header className="topbar"><div className="brand-mark" aria-hidden="true">$</div><h1>BruhImBroke</h1></header>
-    <section className="intervention">
-      <div className="wallet" aria-hidden="true">👛</div>
-      <h2>Your wallet is on standby.</h2>
-      <p className="message">Amazon.com product and cart buttons get a financial reality check. You stay in control.</p>
-      <button className="primary home-action" disabled={opening} onClick={() => void openCheck()}>{opening ? 'Opening…' : 'Check this page'}</button>
-      <p className="message help">On other sites, this opens a manual check and enables checks for recognized shopping buttons until the page reloads. Price detection outside Amazon is manual.</p>
+  return <main className="home-shell">
+    <header className="home-header">
+      <h1>BruhImBroke<span aria-hidden="true">.</span></h1>
+      <details className="home-tools" onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.currentTarget.open = false;
+          event.currentTarget.querySelector('summary')?.focus();
+        }
+      }}>
+        <summary>History &amp; tools <span aria-hidden="true">↗</span></summary>
+        <section className="home-tools-panel" aria-label="Shopping history and tools">
+          <section className="intervention">
+            <div className="wallet" aria-hidden="true">👛</div>
+            <h2>Your wallet is on standby.</h2>
+            <p className="message">Amazon.com product and cart buttons get a financial reality check. You stay in control.</p>
+            <button className="primary home-action" disabled={opening} onClick={() => void openCheck()}>{opening ? 'Opening…' : 'Check this page'}</button>
+            <p className="message help">On other sites, this opens a manual check and enables checks for recognized shopping buttons until the page reloads. Price detection outside Amazon is manual.</p>
+          </section>
+          {error && <p role="alert" className="error">{error}</p>}
+          {!data && !error && <p role="status">Loading saved shopping data…</p>}
+          {data && <>
+            <h2 className="section-title">Shopping history</h2>
+            <p className="message help">With tracking on, your final “Log my purchase” choice records a purchase immediately. Checkout is not verified. Edit the total or delete the entry if you change your mind. Avoid counting both an item and a cart that includes it.</p>
+            {!data.trackingEnabled && <><p className="message">Tracking is off.</p><button className="secondary" onClick={() => void enableTracking()}>Enable shopping history</button></>}
+            {!data.reminders.length && <p className="message help">No unconfirmed attempts or reminders.</p>}
+            {data.reminders.toSorted((a, b) => (b.continuedAt ?? b.recordedAt ?? '').localeCompare(a.continuedAt ?? a.recordedAt ?? '')).map((intent) => <HistoryEntry key={intent.id} intent={intent} trackingEnabled={data.trackingEnabled} />)}
+            <h2 className="section-title">Confirmed purchases</h2>
+            <p className="message help">{data.purchases.length} recorded. This is only what you confirmed, not your total spending.</p>
+            {data.purchases.toSorted((a, b) => b.confirmedAt.localeCompare(a.confirmedAt)).map((purchase) => <HistoryEntry key={purchase.id} intent={purchase} trackingEnabled={data.trackingEnabled} />)}
+            {(data.purchases.length > 0 || data.reminders.length > 0) && (confirmClear ? <div>
+              <p className="message">Delete all purchases, attempts, and reminders? This cannot be undone.</p>
+              <button className="secondary" disabled={clearing} onClick={() => void clearHistory()}>Yes, clear shopping data</button>
+              <button className="secondary" disabled={clearing} onClick={() => setConfirmClear(false)}>Cancel</button>
+            </div> : <button className="secondary" onClick={() => setConfirmClear(true)}>Clear saved shopping data</button>)}
+          </>}
+          <p className="privacy-note">Preferences and records stay locally in Chrome.</p>
+        </section>
+      </details>
+    </header>
+    <section className="professor-stage" aria-label="Professor expression preview">
+      <div className="professor-floor" aria-hidden="true" />
+      {expressions.map((item, index) => <img key={item.label} className="professor-sprite" src={item.image} alt={`${item.label} professor`} hidden={expression !== index} draggable={false} />)}
+      <div className="expression-picker" role="group" aria-label="Preview professor expressions">
+        {expressions.map((item, index) => <button key={item.label} type="button" aria-label={`Preview ${item.label.toLowerCase()} professor`} aria-pressed={expression === index} title={`${item.label} expression preview`} onClick={() => setExpression(index)}><span /></button>)}
+      </div>
     </section>
-    {error && <p role="alert" className="error">{error}</p>}
-    {!data && !error && <p role="status">Loading saved shopping data…</p>}
-    {data && <>
-      <h2 className="section-title">Shopping history</h2>
-      <p className="message help">With tracking on, your final “Log my purchase” choice records a purchase immediately. Checkout is not verified. Edit the total or delete the entry if you change your mind. Avoid counting both an item and a cart that includes it.</p>
-      {!data.trackingEnabled && <><p className="message">Tracking is off.</p><button className="secondary" onClick={() => void enableTracking()}>Enable shopping history</button></>}
-      {!data.reminders.length && <p className="message help">No unconfirmed attempts or reminders.</p>}
-      {data.reminders.toSorted((a, b) => (b.continuedAt ?? b.recordedAt ?? '').localeCompare(a.continuedAt ?? a.recordedAt ?? '')).map((intent) => <HistoryEntry key={intent.id} intent={intent} trackingEnabled={data.trackingEnabled} />)}
-      <h2 className="section-title">Confirmed purchases</h2>
-      <p className="message help">{data.purchases.length} recorded. This is only what you confirmed, not your total spending.</p>
-      {data.purchases.toSorted((a, b) => b.confirmedAt.localeCompare(a.confirmedAt)).map((purchase) => <HistoryEntry key={purchase.id} intent={purchase} trackingEnabled={data.trackingEnabled} />)}
-      {(data.purchases.length > 0 || data.reminders.length > 0) && (confirmClear ? <div>
-        <p className="message">Delete all purchases, attempts, and reminders? This cannot be undone.</p>
-        <button className="secondary" disabled={clearing} onClick={() => void clearHistory()}>Yes, clear shopping data</button>
-        <button className="secondary" disabled={clearing} onClick={() => setConfirmClear(false)}>Cancel</button>
-      </div> : <button className="secondary" onClick={() => setConfirmClear(true)}>Clear saved shopping data</button>)}
-    </>}
-    <p className="privacy-note">Preferences and records stay locally in Chrome.</p>
   </main>;
 }
 

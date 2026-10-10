@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { setTimeout } from 'node:timers/promises';
 import { parseAmount, isPaymentPage } from '../lib/shopping.ts';
-import { openPage, click, fill, waitFor, waitForText, overlay } from './helpers.mjs';
+import { openPage, openHistory, click, fill, waitFor, waitForText, overlay } from './helpers.mjs';
 
 // Synthetic retailer markup. Live checkout execution is deliberately not part of these tests.
 const product = `<h1 id="productTitle">Test headphones</h1>
@@ -56,6 +56,7 @@ test('final confirmation logs a purchase immediately and permits exactly one nex
   assert.equal(Object.keys(stored).filter((key) => key.startsWith('reminder:')).length, 0);
   await waitForText(overlay(document), 'You recorded $280.00 this month.');
   const popup = openPage(t, { stored }).document;
+  await openHistory(popup);
   await waitForText(popup, '1 recorded.');
   click(popup, 'Delete entry');
   await waitForText(popup, 'Yes, delete entry');
@@ -193,12 +194,14 @@ test('reminder is separate until explicit purchase confirmation, including after
   assert.equal(Object.keys(stored).filter((key) => key.startsWith('purchase:')).length, 0);
   assert.equal(Object.keys(stored).filter((key) => key.startsWith('reminder:')).length, 1);
   const popup = openPage(t, { stored }).document;
+  await openHistory(popup);
   await waitForText(popup, 'I bought it');
   click(popup, 'I bought it');
   await waitForText(popup, '1 recorded.');
   assert.equal(Object.keys(stored).filter((key) => key.startsWith('reminder:')).length, 0);
   assert.equal(Object.values(stored).find((value) => value.confirmedAt)?.amountCents, 28000);
   const reopened = openPage(t, { stored }).document;
+  await openHistory(reopened);
   await waitForText(reopened, '1 recorded.');
 });
 

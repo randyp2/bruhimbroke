@@ -85,6 +85,14 @@ export async function waitFor(predicate, message) {
   assert.fail(message);
 }
 
+/** Open the retained tools through the actual landing-page navigation. */
+export async function openHistory(document) {
+  await waitFor(() => document.querySelector('.home-tools'), 'Expected the main menu');
+  const details = document.querySelector('.home-tools');
+  if (!details.open) details.querySelector('summary').click();
+  assert.equal(details.open, true);
+}
+
 /** Use native setters so React sees the same value change as a real user input. */
 export async function fill(root, label, value) {
   const wrapper = [...root.querySelectorAll('label')].find((item) => item.firstChild.textContent.trim() === label);

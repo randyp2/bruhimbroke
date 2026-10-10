@@ -68,3 +68,30 @@ button { width: 100%; border: 0; border-radius: 10px; padding: 12px 14px; font: 
 .history { padding: 0; list-style: none; }
 .history li { display: grid; gap: 4px; padding: 12px 0; border-bottom: 1px solid #ffffff20; font-size: 12px; overflow-wrap: anywhere; }
 .history span { color: #d1c5b3; }
+
+.home-shell { position: relative; isolation: isolate; box-sizing: border-box; width: 720px; height: 460px; overflow: hidden; background: #101113; color: #edeef0; }
+.home-header { display: flex; justify-content: space-between; align-items: center; padding: 28px 32px; }
+.home-header h1 { margin: 0; font-size: 26px; line-height: 1.2; font-weight: 650; letter-spacing: -.065em; }
+.home-header h1 > span { color: #d6ba80; }
+.home-tools { z-index: 2; }
+.home-tools summary { display: flex; align-items: center; gap: 12px; padding: 8px 0 8px 12px; color: #a1a2a8; font-size: 11px; font-weight: 500; cursor: pointer; list-style: none; }
+.home-tools summary::-webkit-details-marker { display: none; }
+.home-tools summary:hover, .home-tools[open] summary { color: #edeef0; }
+.home-tools summary > span { font-size: 16px; }
+.home-tools summary:focus-visible { outline: 2px solid #d6ba80; outline-offset: 5px; border-radius: 4px; }
+.home-tools-panel { position: absolute; inset: 82px 24px 24px; overflow: auto; overscroll-behavior: contain; padding: 24px; border: 1px solid #303137; border-radius: 16px; background: #17181c; box-shadow: 0 16px 48px #0009; color-scheme: dark; }
+.home-tools-panel .intervention { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.home-tools-panel .wallet { display: none; }
+.home-tools-panel .intervention h2 { font-size: 21px; }
+.home-tools-panel .message { color: #bbbcc3; }
+.home-tools-panel .confirmation { border-color: #34353d; }
+.professor-stage { position: absolute; left: 24px; bottom: 12px; width: 270px; height: 330px; }
+.professor-stage::before { content: ''; position: absolute; top: -95px; left: -35px; width: 330px; height: 400px; background: linear-gradient(180deg, #ead8ac00, #ead8ac09 50%, #ead8ac12); clip-path: polygon(44% 0, 56% 0, 100% 100%, 0 100%); filter: blur(18px); pointer-events: none; }
+.professor-floor { position: absolute; bottom: 20px; left: -15px; width: 280px; height: 60px; border-radius: 50%; background: radial-gradient(ellipse, #dfc48c2b 0, #dfc48c0d 42%, transparent 72%); filter: blur(8px); }
+.professor-sprite { position: absolute; bottom: 28px; left: 10px; width: 240px; height: 290px; object-fit: contain; object-position: center bottom; filter: drop-shadow(0 6px 18px #0008); user-select: none; }
+.expression-picker { position: absolute; bottom: 0; left: 92px; display: flex; gap: 2px; }
+.expression-picker button { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border-radius: 50%; background: transparent; }
+.expression-picker span { width: 5px; height: 5px; border-radius: 50%; background: #62636c; transition: background .15s, box-shadow .15s; }
+.expression-picker button[aria-pressed="true"] span { background: #ddc799; box-shadow: 0 0 8px #ddc79950; }
+.expression-picker button:hover span { background: #edeef0; }
+@media (prefers-reduced-motion: reduce) { .expression-picker span { transition: none; } }

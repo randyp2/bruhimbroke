@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { openPage, click, fill, waitFor, waitForText } from './helpers.mjs';
+import { openPage, openHistory, click, fill, waitFor, waitForText } from './helpers.mjs';
 
 const id = '12345678-1234-1234-1234-123456789abc';
 const reminderKey = `reminder:${id}`;
@@ -11,6 +11,7 @@ const history = (item = attempt()) => ({ onboarding: { trackingEnabled: true }, 
 test('history edits product, store, price and date, persists on reopening, and corrects both statuses', async (t) => {
   const stored = history();
   const { document } = openPage(t, { stored });
+  await openHistory(document);
   await waitForText(document, 'Unconfirmed attempt');
   click(document, 'Edit entry');
   await waitForText(document, 'Save changes');
@@ -27,6 +28,7 @@ test('history edits product, store, price and date, persists on reopening, and c
   assert.equal(stored[purchaseKey], undefined);
 
   const reopened = openPage(t, { stored }).document;
+  await openHistory(reopened);
   await waitForText(reopened, 'Corrected item');
   await waitForText(reopened, '$99.95 · 2025-01-15');
   click(reopened, 'Edit entry');
@@ -48,6 +50,7 @@ test('history edits product, store, price and date, persists on reopening, and c
 test('unknown prices require manual entry before purchase confirmation', async (t) => {
   const stored = history({ ...attempt(), amountCents: null });
   const { document } = openPage(t, { stored });
+  await openHistory(document);
   await waitForText(document, 'Amount unknown');
   click(document, 'I bought it');
   await waitForText(document, 'Save changes');
@@ -68,6 +71,7 @@ test('legacy reminders remain editable; cancelling edits or deletion leaves data
   const stored = history(item);
   const original = JSON.stringify(stored);
   const { document } = openPage(t, { stored });
+  await openHistory(document);
   await waitForText(document, 'Date not recorded');
   click(document, 'Edit entry');
   await waitForText(document, 'Save changes');
@@ -92,6 +96,7 @@ test('failed corrections and deletion preserve the existing record and show an e
   const stored = history();
   const original = JSON.stringify(stored);
   const { document, window } = openPage(t, { stored });
+  await openHistory(document);
   window.chrome.storage.local.set = () => Promise.reject(new Error('Storage unavailable'));
   window.chrome.storage.local.remove = () => Promise.reject(new Error('Storage unavailable'));
   await waitForText(document, 'Edit entry');
@@ -114,6 +119,7 @@ test('tracking opt-out permits corrections and removal of old entries but not ne
   const stored = history();
   stored.onboarding.trackingEnabled = false;
   const { document } = openPage(t, { stored });
+  await openHistory(document);
   await waitForText(document, 'Tracking is off.');
   assert.equal([...document.querySelectorAll('button')].find((button) => button.textContent === 'I bought it').disabled, true);
   click(document, 'Edit entry');
