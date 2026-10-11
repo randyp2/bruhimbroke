@@ -4,12 +4,15 @@ import { ShoppingHome } from './ShoppingHome';
 import { SiteAccess } from './SiteAccess';
 import { Professor } from '../../components/Professor';
 import { onboardingLines } from '../../lib/professorLines';
+import type { ComparisonType } from '../../lib/metrics';
 
 type FinancialSituation = 'raise' | 'new-job' | 'improved' | 'no-change';
 
 interface OnboardingData {
   situation: FinancialSituation;
   monthlyIncomeIncrease: number | null;
+  monthlyShoppingBudget: number | null;
+  comparisonType: ComparisonType;
   trackingEnabled: boolean;
 }
 
@@ -18,10 +21,12 @@ interface OnboardingDraft {
   step: 1 | 2 | 3;
   situation: FinancialSituation | null;
   monthlyIncomeIncrease: string;
+  monthlyShoppingBudget: string;
+  comparisonType: ComparisonType;
   trackingEnabled: boolean;
 }
 
-const emptyDraft: OnboardingDraft = { step: 1, situation: null, monthlyIncomeIncrease: '', trackingEnabled: true };
+const emptyDraft: OnboardingDraft = { step: 1, situation: null, monthlyIncomeIncrease: '', monthlyShoppingBudget: '', comparisonType: 'income-increase', trackingEnabled: true };
 
 /** Reject malformed drafts and steps that would bypass the required situation choice. */
 function readDraft(value: unknown): OnboardingDraft {
@@ -32,7 +37,8 @@ function readDraft(value: unknown): OnboardingDraft {
     || !(validSituation || (draft.step === 1 && draft.situation === null))
     || typeof draft.monthlyIncomeIncrease !== 'string'
     || typeof draft.trackingEnabled !== 'boolean') return emptyDraft;
-  return value as OnboardingDraft;
+  const comparisonType: ComparisonType = draft.comparisonType === 'shopping-budget' || (!draft.comparisonType && draft.situation === 'no-change') ? 'shopping-budget' : 'income-increase';
+  return { ...emptyDraft, ...draft, monthlyShoppingBudget: typeof draft.monthlyShoppingBudget === 'string' ? draft.monthlyShoppingBudget : '', comparisonType } as OnboardingDraft;
 }
 
 interface ChromeStorageArea {
@@ -92,7 +98,7 @@ function Onboarding({ initialDraft, onComplete }: { initialDraft: OnboardingDraf
   const [draft, setDraft] = useState(initialDraft);
   const [saving, setSaving] = useState(true);
   const [saveError, setSaveError] = useState(false);
-  const { step, situation, monthlyIncomeIncrease, trackingEnabled } = draft;
+  const { step, situation, monthlyIncomeIncrease, monthlyShoppingBudget, comparisonType, trackingEnabled } = draft;
 
   useEffect(() => {
     let active = true;
@@ -118,6 +124,8 @@ function Onboarding({ initialDraft, onComplete }: { initialDraft: OnboardingDraf
     const data: OnboardingData = {
       situation,
       monthlyIncomeIncrease: monthlyIncomeIncrease ? Number(monthlyIncomeIncrease) : null,
+      monthlyShoppingBudget: monthlyShoppingBudget ? Number(monthlyShoppingBudget) : null,
+      comparisonType,
       trackingEnabled: tracking,
     };
     // Commit completion and clear the draft together, never before the save succeeds.
@@ -148,10 +156,10 @@ function Onboarding({ initialDraft, onComplete }: { initialDraft: OnboardingDraf
           <section aria-labelledby="step-one-title">
             <h2 id="step-one-title">Any money news?</h2>
             <div className="choice-list">
-              <Choice label="Got a raise" selected={situation === 'raise'} onClick={() => updateDraft({ situation: 'raise' })} />
-              <Choice label="New, better-paying job" selected={situation === 'new-job'} onClick={() => updateDraft({ situation: 'new-job' })} />
-              <Choice label="Things improved" selected={situation === 'improved'} onClick={() => updateDraft({ situation: 'improved' })} />
-              <Choice label="No major change" selected={situation === 'no-change'} onClick={() => updateDraft({ situation: 'no-change' })} />
+              <Choice label="Got a raise" selected={situation === 'raise'} onClick={() => updateDraft({ situation: 'raise', comparisonType: 'income-increase' })} />
+              <Choice label="New, better-paying job" selected={situation === 'new-job'} onClick={() => updateDraft({ situation: 'new-job', comparisonType: 'income-increase' })} />
+              <Choice label="Things improved" selected={situation === 'improved'} onClick={() => updateDraft({ situation: 'improved', comparisonType: 'income-increase' })} />
+              <Choice label="No major change" selected={situation === 'no-change'} onClick={() => updateDraft({ situation: 'no-change', comparisonType: 'shopping-budget' })} />
             </div>
             <button className="primary" type="button" disabled={!situation || saving || saveError} onClick={() => updateDraft({ step: 2 })}>Continue</button>
           </section>
@@ -159,16 +167,20 @@ function Onboarding({ initialDraft, onComplete }: { initialDraft: OnboardingDraf
 
         {step === 2 && (
           <section aria-labelledby="step-two-title">
-            <h2 id="step-two-title">Monthly income boost?</h2>
-            <p className="onboarding-caption">Take-home increase. Optional.</p>
+            <h2 id="step-two-title">Choose your comparison.</h2>
+            <div className="choice-list comparison-choices">
+              <Choice label="I have an income increase" selected={comparisonType === 'income-increase'} onClick={() => updateDraft({ comparisonType: 'income-increase' })} />
+              <Choice label="No raise yet" selected={comparisonType === 'shopping-budget'} onClick={() => updateDraft({ comparisonType: 'shopping-budget' })} />
+            </div>
+            <p className="onboarding-caption">{comparisonType === 'income-increase' ? 'Your monthly take-home increase. Optional.' : 'Set a monthly shopping amount to compare against. Optional.'}</p>
             <label className="money-input">
               <span>$</span>
-              <input type="number" min="0" step="1" inputMode="numeric" placeholder="800" value={monthlyIncomeIncrease} onChange={(event) => updateDraft({ monthlyIncomeIncrease: event.target.value })} aria-label="Monthly take-home income increase" />
+              <input type="number" min="0" step="0.01" inputMode="decimal" placeholder={comparisonType === 'income-increase' ? '800' : '300'} value={comparisonType === 'income-increase' ? monthlyIncomeIncrease : monthlyShoppingBudget} onChange={(event) => updateDraft(comparisonType === 'income-increase' ? { monthlyIncomeIncrease: event.target.value } : { monthlyShoppingBudget: event.target.value })} aria-label={comparisonType === 'income-increase' ? 'Monthly take-home income increase' : 'Monthly shopping target'} />
               <small>USD / month</small>
             </label>
             <div className="actions step-actions">
               <button className="primary" type="button" disabled={saving || saveError} onClick={() => updateDraft({ step: 3 })}>Continue</button>
-              <button className="secondary" type="button" disabled={saving || saveError} onClick={() => updateDraft({ monthlyIncomeIncrease: '', step: 3 })}>Skip for now</button>
+              <button className="secondary" type="button" disabled={saving || saveError} onClick={() => updateDraft(comparisonType === 'income-increase' ? { monthlyIncomeIncrease: '', step: 3 } : { monthlyShoppingBudget: '', step: 3 })}>Skip for now</button>
             </div>
           </section>
         )}

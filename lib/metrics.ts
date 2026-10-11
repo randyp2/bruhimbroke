@@ -2,6 +2,7 @@ import type { Purchase } from './shopping';
 
 /** A comedic reaction to a comparison, never a financial-health rating. */
 export type ProfessorMood = 'happy' | 'questionable' | 'sad';
+export type ComparisonType = 'income-increase' | 'shopping-budget';
 
 /** Derived from logged purchases only; monetary calculations stay in integer cents. */
 export interface MonthlyMetrics {
@@ -13,13 +14,13 @@ export interface MonthlyMetrics {
 }
 
 /** Compare this local calendar month's records with the optional monthly income increase. */
-export function monthlyMetrics(purchases: readonly Purchase[], incomeIncrease: number | null, now = new Date()): MonthlyMetrics {
+export function monthlyMetrics(purchases: readonly Purchase[], comparisonAmount: number | null, now = new Date()): MonthlyMetrics {
   const monthly = purchases.filter((purchase) => {
     const date = new Date(purchase.confirmedAt);
     return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
   });
   const totalCents = monthly.reduce((total, purchase) => total + purchase.amountCents, 0);
-  const cents = incomeIncrease === null ? 0 : Math.round(incomeIncrease * 100);
+  const cents = comparisonAmount === null ? 0 : Math.round(comparisonAmount * 100);
   const incomeIncreaseCents = Number.isSafeInteger(cents) && cents > 0 ? cents : null;
   const incomeSharePercent = incomeIncreaseCents === null ? null : totalCents / incomeIncreaseCents * 100;
   // Product-defined comedy thresholds, not a budget or evidence of lifestyle inflation.

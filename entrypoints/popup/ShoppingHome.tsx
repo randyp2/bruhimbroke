@@ -7,6 +7,7 @@ import { Professor } from '../../components/Professor';
 import { monthlyMetrics } from '../../lib/metrics';
 import { professorLines } from '../../lib/professorLines';
 import { money } from '../../lib/shopping';
+import { ComparisonSettings } from './ComparisonSettings';
 
 /** Starts user-initiated checks and records purchases only after explicit confirmation. */
 export function ShoppingHome() {
@@ -17,7 +18,7 @@ export function ShoppingHome() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [lineSeed] = useState(() => Math.random());
-  const metrics = data ? monthlyMetrics(data.purchases, data.incomeIncrease, now) : null;
+  const metrics = data ? monthlyMetrics(data.purchases, data.comparisonAmount, now) : null;
   const mood = data?.trackingEnabled && !error ? metrics?.mood ?? 'questionable' : 'questionable';
   const dialogue = professorLines[mood][Math.floor(lineSeed * professorLines[mood].length)];
   const percent = metrics?.incomeSharePercent === null || !metrics ? null
@@ -88,6 +89,7 @@ export function ShoppingHome() {
   return <main className="home-shell">
     <header className="home-header">
       <h1>BruhImBroke<span aria-hidden="true">.</span></h1>
+      <div className="header-actions">
       <details className="home-tools" onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.currentTarget.open = false;
@@ -128,6 +130,24 @@ export function ShoppingHome() {
           <p id="history-check-help" className="screen-reader-only">Opens a shopping check. Outside Amazon, enter the price manually. Use Automatic checks to enable a site for future visits.</p>
         </section>
       </details>
+      <details className="home-settings" onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.currentTarget.open = false;
+          event.currentTarget.querySelector('summary')?.focus();
+        }
+      }}>
+        <summary aria-label="Settings" title="Settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="m19.4 15 .1.1a1.7 1.7 0 0 1-2.4 2.4l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a1.7 1.7 0 0 1-3.4 0v-.2a1.7 1.7 0 0 0-2.9-1.2l-.1.1a1.7 1.7 0 0 1-2.4-2.4l.1-.1a1.7 1.7 0 0 0-1.2-2.9H4a1.7 1.7 0 0 1 0-3.4h.2a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a1.7 1.7 0 0 1 2.4-2.4l.1.1a1.7 1.7 0 0 0 2.9-1.2V2a1.7 1.7 0 0 1 3.4 0v.2a1.7 1.7 0 0 0 2.9 1.2l.1-.1a1.7 1.7 0 0 1 2.4 2.4l-.1.1a1.7 1.7 0 0 0 1.2 2.9h.2a1.7 1.7 0 0 1 0 3.4h-.2a1.7 1.7 0 0 0-1.2 2.9Z" /></svg>
+          <span className="screen-reader-only">Settings</span>
+        </summary>
+        <section className="home-settings-panel" aria-label="Settings">
+          <header className="history-panel-heading"><div><h2>Settings</h2><p className="history-caption">Your monthly comparison</p></div></header>
+          {data && <ComparisonSettings comparisonType={data.comparisonType} incomeIncrease={data.incomeIncrease} shoppingBudget={data.shoppingBudget} />}
+          {!data && !error && <p role="status">Loading…</p>}
+          {error && <p role="alert" className="error">{error}</p>}
+        </section>
+      </details>
+      </div>
     </header>
     <Professor mood={mood} dialogue={data && !error ? dialogue : undefined} />
     <section className="spending-summary" aria-labelledby="summary-title" data-mood={mood}>
@@ -140,12 +160,12 @@ export function ShoppingHome() {
         {!metrics.count && <p className="summary-empty">No purchases logged this month.</p>}
         {!data.trackingEnabled && <p className="summary-paused">Tracking is off. Only previously saved entries are shown.</p>}
         {percent !== null && metrics.incomeIncreaseCents !== null ? <div className="income-comparison">
-          <div className="comparison-heading"><h3>Shopping vs. income increase</h3><strong className="comparison-percent">{percent}%</strong></div>
-          <div className="comparison-track" role="meter" aria-label="Logged shopping compared with monthly income increase" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, metrics.incomeSharePercent!)} aria-valuetext={`Approximately ${percent}% of your monthly income increase`}><span style={{ width: `${Math.min(100, metrics.incomeSharePercent!)}%` }} /></div>
-          <p className="comparison-context">{money(metrics.totalCents)} logged ÷ {money(metrics.incomeIncreaseCents)} monthly increase</p>
+          <div className="comparison-heading"><h3>Shopping vs. {data.comparisonLabel}</h3><strong className="comparison-percent">{percent}%</strong></div>
+          <div className="comparison-track" role="meter" aria-label={`Logged shopping compared with ${data.comparisonLabel}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, metrics.incomeSharePercent!)} aria-valuetext={`Approximately ${percent}% of your ${data.comparisonLabel}`}><span style={{ width: `${Math.min(100, metrics.incomeSharePercent!)}%` }} /></div>
+          <p className="comparison-context">{money(metrics.totalCents)} logged ÷ {money(metrics.incomeIncreaseCents)} {data.comparisonLabel}</p>
           <p className="summary-note">A comparison, not a budget or proof of lifestyle inflation.</p>
-        </div> : <div className="income-comparison"><h3>No income comparison set</h3><p className="summary-note">You skipped the income increase. Your shopping totals still work.</p></div>}
-        <details className="reaction-explainer"><summary>How the professor reacts</summary><p>Happy from 0% to under 50%, questionable from 50% to under 100%, sad at 100% or more. Reactions use the unrounded comparison, not financial health. No income increase, tracking off, or a loading error keeps him neutral.</p></details>
+        </div> : <div className="income-comparison"><h3>No comparison set</h3><p className="summary-note">Set a monthly income increase or shopping target in History &amp; tools. Your shopping totals still work.</p></div>}
+        <details className="reaction-explainer"><summary>How the professor reacts</summary><p>Happy below 50%, questionable from 50% to under 100%, sad at 100% or more. Reactions compare logged shopping with your selected monthly amount, not financial health. No comparison or tracking off keeps him neutral.</p></details>
         <p className="summary-footnote">Checkout unverified. Edit or delete in History &amp; tools.</p>
         {error && <p className="error" role="alert">{error}</p>}
       </>}

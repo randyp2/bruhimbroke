@@ -3,7 +3,7 @@ import type { ProfessorMood } from './metrics';
 /** Setup dialogue follows the current step, including when a saved draft resumes. */
 export const onboardingLines: Record<1 | 2 | 3, string> = {
   1: 'Did you get a raise? Tell me before Chipotle starts making plans.',
-  2: 'How much extra do you take home? You can skip the salary reveal.',
+  2: 'Got a raise? We’ll use the extra. No raise yet? Set a shopping target.',
   3: 'Your shopping history, your call. My commentary comes free.',
 };
 

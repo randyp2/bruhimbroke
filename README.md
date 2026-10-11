@@ -38,11 +38,11 @@ Got a raise, started a better-paying job, or just doing better financially? Pick
 
 ![First onboarding step with financial situation choices and the professor’s thought bubble](docs/screenshots/01-situation.png)
 
-### 2. Enter the extra monthly income, if you want
+### 2. Pick a comparison, if you want
 
-This is your monthly **take-home increase**, not your whole salary. If you now take home $800 more each month, enter `800`. You can also skip it and still use the shopping checks and history.
+If you got a raise, enter the monthly **take-home increase**, not your whole salary. If you haven’t had a raise, choose **No raise yet** and optionally set a monthly shopping target instead. Either comparison is optional. Shopping checks and history work without one.
 
-![Second onboarding step with an example monthly take-home increase of 800 dollars](docs/screenshots/02-income.png)
+![Second onboarding step with an example monthly comparison amount](docs/screenshots/02-income.png)
 
 ### 3. Choose history and automatic checks
 
@@ -56,7 +56,7 @@ If the popup closes during the permission prompt, just reopen it. Your step and 
 
 ### 4. See where your shopping stands
 
-The main screen shows what you’ve logged this month, how many purchases you’ve logged, and how that total compares with your extra monthly income. The professor changes expressions as the percentage goes up.
+The main screen shows what you’ve logged this month, how many purchases you’ve logged, and how that total compares with your monthly income increase or shopping target. The professor changes expressions as the percentage goes up. You can change the comparison later under **History & tools → Spending comparison**, including after another raise.
 
 In this example, $320 of logged shopping compared with an $800 monthly income increase is **40%**.
 
@@ -101,12 +101,12 @@ Use the **X** to return to the dashboard. **Clear saved shopping data** removes 
 ## What the percentage actually means
 
 ```text
-This month’s logged shopping ÷ monthly take-home income increase × 100
+This month’s logged shopping ÷ your selected monthly comparison × 100
 
 $320 ÷ $800 × 100 = 40%
 ```
 
-At 100%, the shopping you’ve logged this month equals the extra income you entered. It doesn’t mean your bank balance is zero or that you’ve spent your whole salary.
+At 100%, the shopping you’ve logged this month equals the monthly amount you entered. For an income comparison, that is your extra take-home pay. For a no-raise comparison, it is your shopping target. It doesn’t mean your bank balance is zero or that you’ve spent your whole salary.
 
 | Dashboard percentage | Professor |
 | --- | --- |
@@ -114,7 +114,7 @@ At 100%, the shopping you’ve logged this month equals the extra income you ent
 | 50% to below 100% | Questionable |
 | 100% or more | Sad |
 
-Without an income increase, or with tracking off, he stays neutral. The percentage can go above 100%, even though the visual bar stops at full width.
+Without a comparison, or with tracking off, he stays neutral. The percentage can go above 100%, even though the visual bar stops at full width.
 
 The goal is to make lifestyle inflation harder to ignore. But this version compares **total logged shopping** with your income increase. It doesn’t compare spending before and after your raise, so it can’t prove how much of that raise you’ve actually spent on lifestyle upgrades. It’s a reality check, not a full financial picture.
 

@@ -39,13 +39,13 @@ Product thumbnails are omitted for now to avoid extra remote image requests.
 - **Logged this month:** sum of purchase amounts in the current local calendar
   month and year. Calculations use integer cents; unconfirmed reminders do not count.
 - **Purchases logged:** count of those same records.
-- **Income comparison:** monthly logged total divided by the optional monthly
-  take-home income increase, multiplied by 100. Invalid or missing income hides
-  the comparison; it never substitutes zero or guesses an income.
+- **Monthly comparison:** monthly logged total divided by the optional
+  take-home income increase or self-set shopping target, multiplied by 100.
+  Invalid or missing amounts hide the comparison; they are never guessed.
 - **Professor:** happy below 50%, questionable from 50% to under 100%, sad at
   100% or more. These are playful product thresholds, not financial advice.
-  Zero logged spending with an income increase set is happy at 0%.
-  Missing income, tracking off, and read errors keep him neutral
+  Zero logged spending with a comparison set is happy at 0%.
+  Missing comparison, tracking off, and read errors keep him neutral
   using the questionable sprite. The exact ratio drives the mood; displayed
   percentages round to one decimal place. Percentages can exceed 100%, while
   the visual bar stops at full width.
@@ -134,8 +134,8 @@ Other sites' prices are entered manually. Neither mode verifies a completed orde
   based on the user's final confirmation, not proof of completed checkout.
 - Embedded payment frames, closed retailer shadow roots, direct form submissions,
   and sites that act on pointer-down rather than click are outside coverage.
-- Insights use confirmed purchases recorded this calendar month and optional
-  monthly income increase. They do not claim a spending trend or a before/after
+- Insights use confirmed purchases recorded this calendar month and an optional
+  monthly comparison. They do not claim a spending trend or a before/after
   raise comparison. Fictional demo history is not implemented in this flow.
 - Preferences use the existing `onboarding` key; unfinished setup uses
   `onboardingDraft`, which becomes `null` after completion. Older attempts and explicit reminders use

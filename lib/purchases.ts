@@ -1,7 +1,7 @@
 import { browser } from 'wxt/browser';
 import { isIntent, isPurchase } from './shopping';
 import type { Purchase, PurchaseIntent } from './shopping';
-import { monthlyMetrics } from './metrics';
+import { monthlyMetrics, type ComparisonType } from './metrics';
 
 /** Individual keys avoid lost updates when multiple shopping tabs save at once. */
 export async function shoppingData() {
@@ -10,11 +10,19 @@ export async function shoppingData() {
   const reminders = Object.entries(stored).filter(([key, value]) => key.startsWith('reminder:') && isIntent(value)).map(([, value]) => value as PurchaseIntent)
     .filter((item) => !purchases.some((purchase) => purchase.id === item.id));
   const preferences = stored.onboarding && typeof stored.onboarding === 'object' ? stored.onboarding as Record<string, unknown> : {};
+  const comparisonType: ComparisonType = preferences?.comparisonType === 'shopping-budget' ? 'shopping-budget' : 'income-increase';
+  const incomeIncrease = typeof preferences?.monthlyIncomeIncrease === 'number' && Number.isFinite(preferences.monthlyIncomeIncrease) && preferences.monthlyIncomeIncrease > 0 ? preferences.monthlyIncomeIncrease : null;
+  const shoppingBudget = typeof preferences?.monthlyShoppingBudget === 'number' && Number.isFinite(preferences.monthlyShoppingBudget) && preferences.monthlyShoppingBudget > 0 ? preferences.monthlyShoppingBudget : null;
+  const comparisonAmount = comparisonType === 'shopping-budget' ? shoppingBudget : incomeIncrease;
   return {
     purchases,
     reminders,
     trackingEnabled: preferences?.trackingEnabled === true,
-    incomeIncrease: typeof preferences?.monthlyIncomeIncrease === 'number' && Number.isFinite(preferences.monthlyIncomeIncrease) && preferences.monthlyIncomeIncrease > 0 ? preferences.monthlyIncomeIncrease : null,
+    incomeIncrease,
+    shoppingBudget,
+    comparisonType,
+    comparisonLabel: comparisonType === 'shopping-budget' ? 'monthly shopping budget' : 'monthly income increase',
+    comparisonAmount,
   };
 }
 

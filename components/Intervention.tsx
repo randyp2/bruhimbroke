@@ -34,7 +34,7 @@ export function Intervention({ intent, onClose, onContinue }: {
   const [now, setNow] = useState(() => new Date());
   const cents = parseAmount(amount);
   // A partially saved confirmation must not count the same intent twice in its preview.
-  const current = data ? monthlyMetrics(data.purchases.filter((purchase) => purchase.id !== intent.id), data.incomeIncrease, now) : null;
+  const current = data ? monthlyMetrics(data.purchases.filter((purchase) => purchase.id !== intent.id), data.comparisonAmount, now) : null;
   const projected = current ? projectedMetrics(current, cents) : null;
   const mood = data?.trackingEnabled ? projected?.mood ?? 'questionable' : 'questionable';
   const purchaseReaction = !data?.trackingEnabled || projected?.incomeSharePercent == null ? null
@@ -102,12 +102,12 @@ export function Intervention({ intent, onClose, onContinue }: {
       <section className="impact" aria-label="Purchase impact" aria-live="polite">
         {!data ? <p className="muted">{error ? 'Comparison unavailable.' : 'Checking local history…'}</p> : !data.trackingEnabled ? <p className="muted">Tracking is off. Nothing will be logged.</p> : current && projected && <>
           {projected.incomeSharePercent !== null && current.incomeSharePercent !== null ? <>
-            <h2>Shopping vs. income increase</h2>
+            <h2>Shopping vs. {data.comparisonLabel}</h2>
             <div className="impact-percentages"><div><span>Now</span><strong className="current-percent">{percentage(current.incomeSharePercent)}</strong></div><span className="impact-arrow" aria-hidden="true">→</span><div><span>With this purchase</span><strong className="projected-percent">{percentage(projected.incomeSharePercent)}</strong></div></div>
-            <div className="impact-track" role="meter" aria-label="Projected share of monthly income increase" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, projected.incomeSharePercent)} aria-valuetext={percentage(projected.incomeSharePercent)}><span style={{ width: `${Math.min(100, projected.incomeSharePercent)}%` }} /></div>
-          </> : <h2>{cents === null ? 'Enter a total to preview the impact.' : 'No income comparison set.'}</h2>}
+            <div className="impact-track" role="meter" aria-label={`Projected share of ${data.comparisonLabel}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, projected.incomeSharePercent)} aria-valuetext={`${percentage(projected.incomeSharePercent)} of ${data.comparisonLabel}`}><span style={{ width: `${Math.min(100, projected.incomeSharePercent)}%` }} /></div>
+          </> : <h2>{cents === null ? 'Enter a total to preview the impact.' : 'Set a monthly income increase or shopping target in History & tools.'}</h2>}
           <p className="impact-total">{money(current.totalCents)} logged this month{projected.totalCents !== null && <> → <strong>{money(projected.totalCents)}</strong></>}</p>
-          <small>Preview only. Not a budget or spending trend.</small>
+          <small>Preview only. This purchase is not logged until you confirm.</small>
         </>}
       </section>
       {data?.trackingEnabled && !insisting && <button className="reminder" title="Save an unconfirmed reminder, not a purchase" disabled={saving || saved || (amount !== '' && cents === null)} onClick={() => void remind()}>{saving ? 'Saving…' : saved ? 'Reminder saved' : 'Save reminder'}</button>}
