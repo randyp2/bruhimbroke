@@ -1,6 +1,7 @@
 import { browser } from 'wxt/browser';
 import { isIntent, isPurchase } from './shopping';
 import type { Purchase, PurchaseIntent } from './shopping';
+import { monthlyMetrics } from './metrics';
 
 /** Individual keys avoid lost updates when multiple shopping tabs save at once. */
 export async function shoppingData() {
@@ -88,12 +89,8 @@ export async function deleteHistory(intent: PurchaseIntent): Promise<void> {
 /** Compare a proposed purchase only with confirmed, same-month recorded spending. */
 export function spendingInsight(amountCents: number | null, purchases: Purchase[], incomeIncrease: number | null, now = new Date()): string {
   if (amountCents === null) return 'Enter the estimated total to give your wallet some context.';
-  const monthly = purchases.filter((purchase) => {
-    const date = new Date(purchase.confirmedAt);
-    return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-  });
-  const total = monthly.reduce((sum, purchase) => sum + purchase.amountCents, 0);
+  const { totalCents: total, count } = monthlyMetrics(purchases, incomeIncrease, now);
   const dollars = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value / 100);
   const income = incomeIncrease ? ` This one-time purchase is ${Math.round(amountCents / (incomeIncrease * 100) * 100)}% of your reported monthly income increase.` : '';
-  return (monthly.length ? `You recorded ${dollars(total)} this month. If purchased and recorded, this would bring it to ${dollars(total + amountCents)}.` : 'No confirmed purchases recorded this month. A single purchase does not establish a spending trend.') + income;
+  return (count ? `You recorded ${dollars(total)} this month. If purchased and recorded, this would bring it to ${dollars(total + amountCents)}.` : 'No confirmed purchases recorded this month. A single purchase does not establish a spending trend.') + income;
 }

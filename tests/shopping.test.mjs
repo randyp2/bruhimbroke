@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import { setTimeout } from 'node:timers/promises';
 import { parseAmount, isPaymentPage } from '../lib/shopping.ts';
-import { openPage, openHistory, click, fill, waitFor, waitForText, overlay } from './helpers.mjs';
+import { openReadyPage as openPage, openHistory, click, fill, waitFor, waitForText, overlay } from './helpers.mjs';
 
 // Synthetic retailer markup. Live checkout execution is deliberately not part of these tests.
 const product = `<h1 id="productTitle">Test headphones</h1>
@@ -13,8 +14,75 @@ const product = `<h1 id="productTitle">Test headphones</h1>
   <button id="buy-now-button">Buy Now</button><button>Place your order</button>`;
 const prefs = () => ({ onboarding: { situation: 'raise', monthlyIncomeIncrease: 800, trackingEnabled: true } });
 
+test('projected professor reacts to price edits and live history without logging the preview', async (t) => {
+  const stored = prefs();
+  const id = '12345678-1234-1234-1234-123456789abc';
+  stored[`purchase:${id}`] = { id, site: 'amazon.com', title: 'Earlier purchase', action: 'buy-now', amountCents: 32000, confirmedAt: new Date().toISOString() };
+  const { document, window } = await openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored });
+  document.querySelector('#buy-now-button').click();
+  const root = overlay(document);
+  await waitForText(root, '75%');
+  assert.equal(root.querySelector('.current-percent').textContent, '40%');
+  for (const [amount, share, mood] of [['79.99', '50%', 'happy'], ['80.00', '50%', 'questionable'], ['480.00', '100%', 'sad'], ['880.00', '150%', 'sad'], ['0', '40%', 'happy']]) {
+    await fill(root, 'Total (USD)', amount);
+    await waitFor(() => root.querySelector('.projected-percent')?.textContent === share && root.querySelector('.professor-stage').dataset.mood === mood, 'Price edits must update the projection and exact mood');
+    assert.equal(root.querySelector('.professor-sprite:not([hidden])').alt, mood === 'happy' ? 'Good purchase professor' : 'Bad purchase professor');
+    const src = new URL(root.querySelector('.professor-sprite:not([hidden])').src);
+    assert.equal(src.protocol, 'chrome-extension:');
+    assert.equal(src.hostname, 'test-extension');
+    const path = src.pathname.slice(1);
+    assert.ok(readFileSync(new URL(`../.output/chrome-mv3/${path}`, import.meta.url)).length > 0);
+    const manifest = JSON.parse(readFileSync(new URL('../.output/chrome-mv3/manifest.json', import.meta.url), 'utf8'));
+    assert.ok(manifest.web_accessible_resources.some((entry) => entry.matches.includes('https://*/*') && entry.resources.some((pattern) => new RegExp(`^${pattern.replaceAll('.', '\\.').replaceAll('*', '.*')}$`).test(path))));
+  }
+  await window.chrome.storage.local.set({ [`purchase:${id}`]: { ...stored[`purchase:${id}`], amountCents: 80000 } });
+  await waitFor(() => root.querySelector('.projected-percent')?.textContent === '100%', 'Other tabs must refresh the projection');
+  await fill(root, 'Total (USD)', '');
+  await waitForText(root, 'Enter a total to preview');
+  assert.equal(root.querySelector('.projected-percent'), null);
+  assert.equal(root.querySelector('.professor-stage').dataset.mood, 'questionable');
+  assert.equal(root.querySelector('.professor-sprite:not([hidden])').alt, 'Questionable professor');
+  assert.equal(Object.keys(stored).filter((key) => key.startsWith('purchase:')).length, 1);
+});
+
+test('missing income and tracking off keep projected reactions neutral', async (t) => {
+  for (const onboarding of [{ trackingEnabled: true }, { trackingEnabled: false, monthlyIncomeIncrease: 800 }]) {
+    const { document } = await openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored: { onboarding } });
+    document.querySelector('#buy-now-button').click();
+    const root = overlay(document);
+    await waitForText(root, onboarding.trackingEnabled ? 'No income comparison set.' : 'Tracking is off.');
+    assert.equal(root.querySelector('.projected-percent'), null);
+    assert.equal(root.querySelector('.professor-stage').dataset.mood, 'questionable');
+    click(root, 'I’m buying it anyway');
+    await waitForText(root, 'Overruling the professor?');
+    assert.equal(root.querySelector('.professor-sprite:not([hidden])').alt, 'Questionable professor');
+  }
+});
+
+test('insisting only uses reconsider for projected spending at or above fifty percent', async (t) => {
+  const stored = prefs();
+  const { document } = await openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored });
+  document.querySelector('#buy-now-button').click();
+  const root = overlay(document);
+  await waitForText(root, '35%');
+  assert.equal(root.querySelector('.professor-sprite:not([hidden])').alt, 'Good purchase professor');
+  await fill(root, 'Total (USD)', '400');
+  assert.equal(root.querySelector('.professor-sprite:not([hidden])').alt, 'Bad purchase professor');
+  click(root, 'I’m buying it anyway');
+  await waitForText(root, 'Overruling the professor?');
+  assert.equal(root.querySelector('.professor-sprite:not([hidden])').alt, 'Reconsidering professor');
+  const reconsiderSource = root.querySelector('.professor-sprite:not([hidden])').src;
+  for (const [amount, label] of [['399.99', 'Good purchase'], ['0', 'Good purchase'], ['800', 'Reconsidering'], ['', 'Questionable']]) {
+    await fill(root, 'Total (USD)', amount);
+    assert.equal(root.querySelector('.professor-sprite:not([hidden])').alt, `${label} professor`);
+  }
+  await fill(root, 'Total (USD)', '400');
+  assert.equal(root.querySelector('.professor-sprite:not([hidden])').src, reconsiderSource);
+  assert.equal(Object.keys(stored).length, 1, 'Insisting and preview changes must not log a purchase');
+});
+
 test('Amazon nested click pauses, uses item price and quantity, and reconsiders without buying', async (t) => {
-  const { document, stored } = openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored: prefs() });
+  const { document, stored } = await openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored: prefs() });
   let retailerClicks = 0;
   const button = document.querySelector('#add-to-cart-button');
   button.addEventListener('click', () => retailerClicks++);
@@ -24,7 +92,7 @@ test('Amazon nested click pauses, uses item price and quantity, and reconsiders 
   assert.equal(document.querySelector('bruhim-broke').shadowRoot, null);
   assert.ok(root.querySelector('dialog[open]'));
   assert.equal(root.querySelectorAll('input')[1].value, '280.00');
-  await waitForText(root, '35% of your reported monthly income increase');
+  await waitForText(root, '35%');
   assert.equal(Object.keys(stored).length, 1);
   click(root, 'I’ll reconsider');
   assert.equal(overlay(document), undefined);
@@ -32,7 +100,7 @@ test('Amazon nested click pauses, uses item price and quantity, and reconsiders 
 });
 
 test('final confirmation logs a purchase immediately and permits exactly one next site click', async (t) => {
-  const { document, stored } = openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored: prefs() });
+  const { document, stored } = await openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored: prefs() });
   let retailerClicks = 0;
   const button = document.querySelector('#buy-now-button');
   button.addEventListener('click', () => retailerClicks++);
@@ -54,8 +122,8 @@ test('final confirmation logs a purchase immediately and permits exactly one nex
   assert.equal(purchases[0][1].amountCents, 28000);
   assert.ok(purchases[0][1].confirmedAt);
   assert.equal(Object.keys(stored).filter((key) => key.startsWith('reminder:')).length, 0);
-  await waitForText(overlay(document), 'You recorded $280.00 this month.');
-  const popup = openPage(t, { stored }).document;
+  await waitForText(overlay(document), '$280.00 logged this month');
+  const popup = (await openPage(t, { stored })).document;
   await openHistory(popup);
   await waitForText(popup, '1 recorded.');
   click(popup, 'Delete entry');
@@ -66,15 +134,15 @@ test('final confirmation logs a purchase immediately and permits exactly one nex
 });
 
 test('final confirmation waits for storage and converts an existing reminder without duplicates', async (t) => {
-  const { document, window, stored } = openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored: prefs() });
+  const { document, window, stored } = await openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored: prefs() });
   document.querySelector('#buy-now-button').click();
   const root = overlay(document);
-  await waitForText(root, 'Remind me to confirm later');
-  click(root, 'Remind me to confirm later');
+  await waitForText(root, 'Save reminder');
+  click(root, 'Save reminder');
   await waitForText(root, 'Reminder saved.');
   const reminderId = Object.values(stored).find((entry) => entry.id).id;
-  await fill(root, 'What are you considering?', 'Corrected headphones');
-  await fill(root, 'Estimated total (USD)', '123.45');
+  await fill(root, 'Product', 'Corrected headphones');
+  await fill(root, 'Total (USD)', '123.45');
   const set = window.chrome.storage.local.set;
   let release;
   window.chrome.storage.local.set = (items) => new Promise((resolve) => { release = () => resolve(set(items)); });
@@ -95,7 +163,7 @@ test('final confirmation waits for storage and converts an existing reminder wit
 });
 
 test('failed automatic logging offers retry or an explicit continue-without-saving escape', async (t) => {
-  const { document, window, stored } = openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored: prefs() });
+  const { document, window, stored } = await openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored: prefs() });
   window.chrome.storage.local.set = () => Promise.reject(new Error('Storage unavailable'));
   document.querySelector('#buy-now-button').click();
   const root = overlay(document);
@@ -110,7 +178,7 @@ test('failed automatic logging offers retry or an explicit continue-without-savi
 });
 
 test('dismissing during a pending save does not later bypass the next intervention', async (t) => {
-  const { document, window } = openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored: prefs() });
+  const { document, window } = await openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored: prefs() });
   const set = window.chrome.storage.local.set;
   let release;
   window.chrome.storage.local.set = (items) => new Promise((resolve) => { release = () => resolve(set(items)); });
@@ -132,7 +200,7 @@ test('dismissing during a pending save does not later bypass the next interventi
 test('unknown prices require a total to log, while opting out or continuing without saving records nothing', async (t) => {
   for (const trackingEnabled of [true, false]) {
     const stored = { onboarding: { trackingEnabled } };
-    const { document } = openPage(t, { page: '<h1>Unknown price</h1><button id="buy-now-button">Buy Now</button>', url: 'https://www.amazon.com/dp/TEST', content: true, stored });
+    const { document } = await openPage(t, { page: '<h1>Unknown price</h1><button id="buy-now-button">Buy Now</button>', url: 'https://www.amazon.com/dp/TEST', content: true, stored });
     document.querySelector('button').click();
     const root = overlay(document);
     click(root, 'I’m buying it anyway');
@@ -149,14 +217,14 @@ test('unknown prices require a total to log, while opting out or continuing with
 });
 
 test('a corrected unknown price can be logged immediately without a second popup confirmation', async (t) => {
-  const { document, stored } = openPage(t, { page: '<h1>Unknown price</h1><button id="buy-now-button">Buy Now</button>', url: 'https://www.amazon.com/dp/TEST', content: true, stored: prefs() });
+  const { document, stored } = await openPage(t, { page: '<h1>Unknown price</h1><button id="buy-now-button">Buy Now</button>', url: 'https://www.amazon.com/dp/TEST', content: true, stored: prefs() });
   document.querySelector('button').click();
   const root = overlay(document);
   click(root, 'I’m buying it anyway');
   await waitForText(root, 'Enter a valid USD total to log this purchase');
-  await fill(root, 'Estimated total (USD)', '-5');
+  await fill(root, 'Total (USD)', '-5');
   assert.equal([...root.querySelectorAll('button')].find((button) => button.textContent === 'RIP wallet. Log my purchase.').disabled, true);
-  await fill(root, 'Estimated total (USD)', '19.99');
+  await fill(root, 'Total (USD)', '19.99');
   click(root, 'RIP wallet. Log my purchase.');
   await waitFor(() => !overlay(document), 'Confirmation should finish');
   const purchase = Object.values(stored).find((entry) => entry.confirmedAt);
@@ -164,11 +232,11 @@ test('a corrected unknown price can be logged immediately without a second popup
 });
 
 test('retrying a partial save keeps one purchase and removes the old reminder', async (t) => {
-  const { document, window, stored } = openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored: prefs() });
+  const { document, window, stored } = await openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored: prefs() });
   document.querySelector('#buy-now-button').click();
   const root = overlay(document);
-  await waitForText(root, 'Remind me to confirm later');
-  click(root, 'Remind me to confirm later');
+  await waitForText(root, 'Save reminder');
+  click(root, 'Save reminder');
   await waitForText(root, 'Reminder saved.');
   const remove = window.chrome.storage.local.remove;
   window.chrome.storage.local.remove = () => Promise.reject(new Error('Storage unavailable'));
@@ -185,43 +253,43 @@ test('retrying a partial save keeps one purchase and removes the old reminder', 
 
 test('reminder is separate until explicit purchase confirmation, including after reopening', async (t) => {
   const stored = prefs();
-  const { document } = openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored });
+  const { document } = await openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored });
   document.querySelector('#add-to-cart-button').click();
   const root = overlay(document);
-  await waitForText(root, 'Remind me to confirm later');
-  click(root, 'Remind me to confirm later');
+  await waitForText(root, 'Save reminder');
+  click(root, 'Save reminder');
   await waitForText(root, 'Reminder saved. No purchase has been recorded.');
   assert.equal(Object.keys(stored).filter((key) => key.startsWith('purchase:')).length, 0);
   assert.equal(Object.keys(stored).filter((key) => key.startsWith('reminder:')).length, 1);
-  const popup = openPage(t, { stored }).document;
+  const popup = (await openPage(t, { stored })).document;
   await openHistory(popup);
   await waitForText(popup, 'I bought it');
   click(popup, 'I bought it');
   await waitForText(popup, '1 recorded.');
   assert.equal(Object.keys(stored).filter((key) => key.startsWith('reminder:')).length, 0);
   assert.equal(Object.values(stored).find((value) => value.confirmedAt)?.amountCents, 28000);
-  const reopened = openPage(t, { stored }).document;
+  const reopened = (await openPage(t, { stored })).document;
   await openHistory(reopened);
   await waitForText(reopened, '1 recorded.');
 });
 
 test('tracking off hides reminder saving; unknown price has a manual fallback', async (t) => {
   const stored = { onboarding: { trackingEnabled: false } };
-  const { document } = openPage(t, { page: '<h1>Something</h1><button id="buy-now-button">Buy Now</button>', url: 'https://www.amazon.com/dp/TEST', content: true, stored });
+  const { document } = await openPage(t, { page: '<h1>Something</h1><button id="buy-now-button">Buy Now</button>', url: 'https://www.amazon.com/dp/TEST', content: true, stored });
   document.querySelector('button').click();
   const root = overlay(document);
   await waitForText(root, 'Enter the estimated total');
   assert.equal(root.querySelectorAll('input')[1].value, '');
-  assert.ok(!root.textContent.includes('Remind me to confirm later'));
+  assert.ok(!root.textContent.includes('Save reminder'));
   const input = root.querySelectorAll('input')[1];
   const window = document.defaultView;
   Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, '12.34');
   input.dispatchEvent(new window.Event('input', { bubbles: true }));
-  await waitForText(root, 'A single purchase does not establish a spending trend.');
+  await waitForText(root, 'Tracking is off. Nothing will be logged.');
 });
 
 test('generic pages require manual activation, support dynamic buttons, and reject foreign messages', async (t) => {
-  const { document, message } = openPage(t, { page: '<h1>Shirt</h1><button>Add to cart</button>', url: 'https://example.com/products/shirt', content: true });
+  const { document, message } = await openPage(t, { page: '<h1>Shirt</h1><button>Add to cart</button>', url: 'https://example.com/products/shirt', content: true });
   document.querySelector('button').click();
   assert.equal(overlay(document), undefined);
   message({ type: 'shopping:open' }, { id: 'another-extension' });
@@ -235,20 +303,20 @@ test('generic pages require manual activation, support dynamic buttons, and reje
   assert.ok(overlay(document));
 });
 
-test('cart intent uses subtotal, not an unrelated recommended product price', (t) => {
-  const { document } = openPage(t, { page: '<div id="sc-subtotal-amount-activecart"><span class="sc-price">$350.00</span></div><span class="a-offscreen">$9.99</span><button name="proceedToRetailCheckout">Proceed to checkout</button>', url: 'https://www.amazon.com/gp/cart/view.html', content: true });
+test('cart intent uses subtotal, not an unrelated recommended product price', async (t) => {
+  const { document } = await openPage(t, { page: '<div id="sc-subtotal-amount-activecart"><span class="sc-price">$350.00</span></div><span class="a-offscreen">$9.99</span><button name="proceedToRetailCheckout">Proceed to checkout</button>', url: 'https://www.amazon.com/gp/cart/view.html', content: true });
   document.querySelector('button').click();
   assert.equal(overlay(document).querySelectorAll('input')[1].value, '350.00');
 });
 
-test('payment pages, final-order buttons, modified clicks, and disabled buttons pass untouched', (t) => {
+test('payment pages, final-order buttons, modified clicks, and disabled buttons pass untouched', async (t) => {
   for (const path of ['/gp/buy/spc/handlers/display.html', '/checkout', '/orders/confirm']) {
-    const { document, message } = openPage(t, { page: product, url: `https://www.amazon.com${path}`, content: true });
+    const { document, message } = await openPage(t, { page: product, url: `https://www.amazon.com${path}`, content: true });
     document.querySelector('#buy-now-button').click();
     assert.equal(overlay(document), undefined);
     assert.ok(message({ type: 'shopping:open' }).error);
   }
-  const { document, window } = openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true });
+  const { document, window } = await openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true });
   [...document.querySelectorAll('button')].at(-1).click();
   const buy = document.querySelector('#buy-now-button');
   buy.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }));
@@ -258,7 +326,7 @@ test('payment pages, final-order buttons, modified clicks, and disabled buttons 
 });
 
 test('storage failure still permits dismissal and continuation', async (t) => {
-  const { document } = openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, storageError: true });
+  const { document } = await openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, storageError: true });
   document.querySelector('#add-to-cart-button').click();
   const root = overlay(document);
   await waitForText(root, 'Could not read your preferences');
@@ -266,8 +334,8 @@ test('storage failure still permits dismissal and continuation', async (t) => {
   assert.equal(overlay(document), undefined);
 });
 
-test('Escape cancels without triggering the original purchase action', (t) => {
-  const { document, window } = openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true });
+test('Escape cancels without triggering the original purchase action', async (t) => {
+  const { document, window } = await openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true });
   document.querySelector('#buy-now-button').click();
   overlay(document).querySelector('dialog').dispatchEvent(new window.Event('cancel', { cancelable: true }));
   assert.equal(overlay(document), undefined);
@@ -280,16 +348,16 @@ test('money parsing rejects ambiguous currencies, malformed numbers, and impossi
   assert.equal(isPaymentPage(new URL('https://example.com/products/checkout-shirt')), false);
 });
 
-test('recommendation buttons never borrow the main Amazon product price', (t) => {
-  const { document } = openPage(t, { page: product + '<button id="recommendation">Add to Cart</button>', url: 'https://www.amazon.com/dp/TEST', content: true });
+test('recommendation buttons never borrow the main Amazon product price', async (t) => {
+  const { document } = await openPage(t, { page: product + '<button id="recommendation">Add to Cart</button>', url: 'https://www.amazon.com/dp/TEST', content: true });
   document.querySelector('#recommendation').click();
   assert.equal(overlay(document), undefined);
 });
 
-test('conflicting offer prices require manual entry; hidden prices are excluded', (t) => {
+test('conflicting offer prices require manual entry; hidden prices are excluded', async (t) => {
   for (const hidden of [false, true]) {
     const price = `<div id="corePrice_feature_div" ${hidden ? 'style="display:none"' : ''}><span class="a-price"><span class="a-offscreen">$100.00</span></span></div>`;
-    const { document } = openPage(t, { page: product + price, url: 'https://www.amazon.com/dp/TEST', content: true });
+    const { document } = await openPage(t, { page: product + price, url: 'https://www.amazon.com/dp/TEST', content: true });
     document.querySelector('#buy-now-button').click();
     assert.equal(overlay(document).querySelectorAll('input')[1].value, hidden ? '280.00' : '');
   }
@@ -300,13 +368,13 @@ test('confirmed monthly spending is used, while reminders are excluded', async (
   const item = { id: '12345678-1234-1234-1234-123456789abc', site: 'www.amazon.com', title: 'Already bought', action: 'add-to-cart', amountCents: 10000, confirmedAt: new Date().toISOString() };
   stored[`purchase:${item.id}`] = item;
   stored['reminder:other'] = { ...item, id: '12345678-1234-1234-1234-123456789abd', amountCents: 90000 };
-  const { document } = openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored });
+  const { document } = await openPage(t, { page: product, url: 'https://www.amazon.com/dp/TEST', content: true, stored });
   document.querySelector('#buy-now-button').click();
-  await waitForText(overlay(document), 'You recorded $100.00 this month. If purchased and recorded, this would bring it to $380.00.');
+  await waitForText(overlay(document), '$100.00 logged this month → $380.00');
 });
 
-test('manual checks work when crypto.randomUUID is unavailable on HTTP', (t) => {
-  const { document, window, message } = openPage(t, { page: '<h1>HTTP storefront</h1>', url: 'http://example.com/products/test', content: true });
+test('manual checks work when crypto.randomUUID is unavailable on HTTP', async (t) => {
+  const { document, window, message } = await openPage(t, { page: '<h1>HTTP storefront</h1>', url: 'http://example.com/products/test', content: true });
   Object.defineProperty(window.crypto, 'randomUUID', { value: undefined });
   assert.equal(message({ type: 'shopping:open' }).ok, true);
   assert.ok(overlay(document));

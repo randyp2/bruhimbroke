@@ -6,6 +6,7 @@ that every retailer flow has been tested in a signed-in browser.
 | Retailer | Early shopping wording | Implementation decision |
 | --- | --- | --- |
 | Amazon | Add to Cart, Buy Now, Proceed to checkout | Automatic on Amazon.com product/cart pages; main control IDs/names only, plus checkout labels on cart pages. |
+| eBay.com | Buy It Now, Add to cart | Automatic after website approval on fixed-price `/itm/` listing actions. Bids, offers, and checkout are excluded; price entry is manual. |
 | Target | Add to cart, view cart & check out, I'm ready to check out | Exact-label detection after the user activates the page. Place my order is excluded. |
 | Walmart | Add, Checkout | Checkout is recognized on cart pages after activation. Bare Add is too ambiguous and is not intercepted. |
 | Shopify stores | Add to cart, Buy it now, branded wallet buttons | Ordinary exact-label controls can work after activation. Accelerated wallet controls inside closed shadow roots are not supported. |
@@ -17,6 +18,44 @@ Sources:
 - [Target order creation](https://www.target.com/help/articles/orders-purchases/create-an-order)
 - [Walmart site and app experience](https://www.walmart.com/help/article/the-walmart-site-and-app-experience/27f2678cb25a40a7b57a359fec3ca67f)
 - [Shopify accelerated checkout](https://shopify.dev/docs/storefronts/themes/pricing-payments/accelerated-checkout)
+- [eBay shopping cart](https://ocsnext.ebay.com/help/buying/paying-items/shopping-cart?id=4360)
+- [Public eBay listing inspected October 10, 2026](https://www.ebay.com/itm/147469673640)
+
+## Persistent access
+
+Amazon remains a manifest-declared script. One optional approval now requests
+all HTTP(S) sites and creates persistent dynamic scripts, excluding Amazon's
+existing static matches to avoid duplicate injection. Onboarding step 3 and
+the tools panel share the same explicit permission button. Legacy individual
+host grants continue working; broad grants replace overlapping registrations.
+Chrome manages grants and registrations, separate from purchase history.
+
+The background worker reconciles registrations on install, startup, and permission
+changes. Revocation also notifies existing listeners because unregistering a
+script does not remove one already injected. Access responses are generation-guarded
+so stale replies cannot re-enable a revoked listener. Manual checks remain
+temporary; persistent access is rechecked on SPA navigation. All sites, including
+Amazon, wait for the worker's local pause check before automatic interception.
+Pauses use validated exact hostnames in `shoppingPausedHosts`, apply across both
+protocols, and notify open tabs immediately. The script can still be loaded on
+a paused site, but does not intercept clicks or extract product data. A manual
+check is allowed without silently resuming automatic checks. Pausing does not
+remove Chrome's host permission, clear financial data, or save browsing history.
+
+Generic labels need product/cart context: a product/cart URL, a containing cart
+element, Product microdata, or an add-to-cart form. This deliberately misses
+unfamiliar layouts instead of intercepting matching words anywhere on the web.
+Forms with card-autocomplete fields are excluded without reading their values.
+Shopping URL segments include `product(s)`, `p`, `dp`, `shop`, `store`, `item(s)`,
+`collection(s)`, and `catalog`/`catalogue`. They must be whole path segments,
+not substrings, hostname words, query parameters, or fragments. A matching URL
+alone never triggers an intervention; a recognized shopping control is still
+required. The Arc’teryx `/us/en/shop/mens/...` route and nested Add to cart control
+are covered by a production-bundle regression test. Checkout buttons still need
+cart context, and payment/order exclusions take precedence over shopping words.
+
+- [Chrome optional permissions](https://developer.chrome.com/docs/extensions/reference/api/permissions)
+- [Dynamic content scripts](https://developer.chrome.com/docs/extensions/reference/api/scripting)
 
 The public Amazon HTML contains native submit inputs, accessible labels on
 separate sibling elements, a quantity select, multiple purchase offers, and

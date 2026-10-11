@@ -74,11 +74,17 @@ export function HistoryEntry({ intent, trackingEnabled }: { intent: PurchaseInte
     }
   }
 
-  return <section className="confirmation">
-    <h3>{intent.title}</h3>
-    <p className="message help">{confirmed ? 'Confirmed purchase' : intent.continuedAt ? 'Continued anyway · Unconfirmed attempt' : 'Unconfirmed reminder'}</p>
-    {editing ? <form onSubmit={(event) => { event.preventDefault(); void save(); }}>
-      <label>Product<input required maxLength={200} disabled={busy} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
+  return <section className="history-entry">
+    <div className="history-entry-heading">
+      <div className="history-entry-product">
+        <h3 title={intent.title}>{intent.title}</h3>
+        <p className="history-entry-meta">{intent.site}<span aria-hidden="true"> · </span>{confirmed || intent.recordedAt || intent.continuedAt ? <time dateTime={historyDate(intent)}>{historyDate(intent)}</time> : 'Date not recorded'}</p>
+      </div>
+      <strong className="history-entry-amount">{intent.amountCents === null ? 'Amount unknown' : money(intent.amountCents)}</strong>
+    </div>
+    {!confirmed && <p className="history-entry-status">{intent.continuedAt ? 'Unconfirmed attempt' : 'Unconfirmed reminder'}</p>}
+    {editing ? <form className="history-editor" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+      <label className="history-editor-wide">Product<input required maxLength={200} disabled={busy} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
       <label>Website or store<input required maxLength={253} disabled={busy} value={site} onChange={(event) => setSite(event.target.value)} /></label>
       <label>Amount (USD)<input inputMode="decimal" required={purchased} disabled={busy} value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
       <label>Date<input type="date" required disabled={busy} value={date} onChange={(event) => setDate(event.target.value)} /></label>
@@ -86,21 +92,24 @@ export function HistoryEntry({ intent, trackingEnabled }: { intent: PurchaseInte
         <option value="unconfirmed">Unconfirmed</option>
         <option value="purchased" disabled={!trackingEnabled && !confirmed}>Purchased</option>
       </select></label>
-      <p className="message help">Choose Purchased only if you actually bought it. Unconfirmed entries are excluded from spending totals.</p>
-      <button className="primary" disabled={busy} type="submit">{busy ? 'Saving…' : 'Save changes'}</button>
-      <button className="secondary" disabled={busy} type="button" onClick={() => { setEditing(false); setError(''); }}>Cancel editing</button>
+      <p className="history-editor-wide history-caption">Only Purchased entries count toward spending.</p>
+      <div className="history-editor-wide history-entry-actions">
+        <button className="history-button history-button-primary" disabled={busy} type="submit">{busy ? 'Saving…' : 'Save changes'}</button>
+        <button className="history-button" disabled={busy} type="button" onClick={() => { setEditing(false); setError(''); }}>Cancel editing</button>
+      </div>
     </form> : <>
-      <p className="message help">{intent.site}<br />{intent.amountCents === null ? 'Amount unknown' : money(intent.amountCents)} · {confirmed || intent.recordedAt || intent.continuedAt ? historyDate(intent) : 'Date not recorded'}</p>
-      {!confirmed && <>
-        <p className="message help">Confirm once, using your final total. Do not record both an item and a cart that includes it.</p>
-        <button className="primary" disabled={busy || !trackingEnabled} onClick={() => void confirm()}>I bought it</button>
-      </>}
-      <button className="secondary" disabled={busy} onClick={edit} aria-label={`Edit ${intent.title}`}>Edit entry</button>
-      {deleting ? <>
-        <p className="message help">Delete this entry permanently?</p>
-        <button className="secondary" disabled={busy} onClick={() => void remove()}>Yes, delete entry</button>
-        <button className="secondary" disabled={busy} onClick={() => setDeleting(false)}>Cancel deletion</button>
-      </> : <button className="secondary" disabled={busy} onClick={() => setDeleting(true)} aria-label={`Delete ${intent.title}`}>Delete entry</button>}
+      <div className="history-entry-actions">
+        {!confirmed && <button className="history-button history-button-primary" disabled={busy || !trackingEnabled} onClick={() => void confirm()}>I bought it</button>}
+        <button className="history-button" disabled={busy} onClick={edit} aria-label={`Edit ${intent.title}`}>Edit entry</button>
+        {!deleting && <button className="history-button history-button-danger" disabled={busy} onClick={() => setDeleting(true)} aria-label={`Delete ${intent.title}`}>Delete entry</button>}
+      </div>
+      {deleting && <div className="history-delete-confirm">
+        <p>Delete this entry permanently?</p>
+        <div className="history-entry-actions">
+          <button className="history-button history-button-danger" disabled={busy} onClick={() => void remove()}>Yes, delete entry</button>
+          <button className="history-button" disabled={busy} onClick={() => setDeleting(false)}>Cancel deletion</button>
+        </div>
+      </div>}
     </>}
     {error && <p role="alert" className="error">{error}</p>}
   </section>;

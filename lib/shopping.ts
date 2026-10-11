@@ -68,7 +68,16 @@ export function purchaseControl(target: EventTarget | null, url: URL): { element
     if (!/\/(?:dp|gp\/product|gp\/aw\/d|gp\/cart|cart)(?:\/|$)/.test(url.pathname)) return null;
   }
   if (!action) return null;
-  if (action === 'checkout' && !/cart|basket|bag/i.test(url.pathname) && !element.closest('[id*="cart"], [id*="Cart"], [id*="basket"]')) return null;
+  const cartContext = /\/(?:cart|basket|bag)(?:\/|\.|$)/i.test(url.pathname) || element.closest('[id*="cart"], [id*="Cart"], [id*="basket"]');
+  if (action === 'checkout' && !cartContext) return null;
+  if (!isAmazon(url)) {
+    if (url.hostname === 'www.ebay.com' || url.hostname === 'ebay.com') {
+      // Fixed-price listing actions only. Auctions, offers, and payment flows pass through.
+      if (!/^\/itm\//.test(url.pathname) || !['buy-now', 'add-to-cart'].includes(action)) return null;
+    } else if (!cartContext && !/\/(?:products?|p|dp|shop|store|items?|collections?|catalog(?:ue)?)(?:\/|$)/i.test(url.pathname)
+      && !element.closest('[itemtype="https://schema.org/Product"], [itemtype="http://schema.org/Product"], form[action*="/cart/add"]')) return null;
+    if (element.closest('form')?.querySelector('[autocomplete^="cc-"]')) return null;
+  }
   return { element, action };
 }
 

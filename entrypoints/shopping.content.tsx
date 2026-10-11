@@ -3,17 +3,37 @@ import { flushSync } from 'react-dom';
 import { browser } from 'wxt/browser';
 import { Intervention } from '../components/Intervention';
 import styles from '../components/intervention.css?inline';
-import { isAmazon, isPaymentPage, purchaseControl, readIntent } from '../lib/shopping';
+import professorStyles from '../components/professor.css?inline';
+import { isPaymentPage, purchaseControl, readIntent } from '../lib/shopping';
 import type { PurchaseIntent } from '../lib/shopping';
 
 export default defineContentScript({
   matches: ['https://www.amazon.com/*', 'https://amazon.com/*'],
   runAt: 'document_start',
   main(ctx) {
-    let enabled = isAmazon(new URL(location.href));
+    let enabled = false;
+    let paused = true;
+    let manualActivation = false;
+    let accessRequest = 0;
     let active = false;
     let closeActive: (() => void) | undefined;
     let bypass: { element: HTMLElement; url: string; until: number } | null = null;
+
+    async function refreshAccess() {
+      const request = ++accessRequest;
+      // Wait for local pause settings even on Amazon to avoid a first-click race.
+      enabled = false;
+      paused = true;
+      manualActivation = false;
+      try {
+        const response = await browser.runtime.sendMessage({ type: 'shopping:access' });
+        if (ctx.isValid && request === accessRequest) {
+          paused = response?.paused === true;
+          enabled = !paused && (response?.enabled === true || manualActivation);
+        }
+      } catch { /* Without verified access, only manual activation is allowed. */ }
+    }
+    void refreshAccess();
 
     function show(intent: PurchaseIntent, control?: HTMLElement): boolean {
       if (active || !document.body) return false;
@@ -23,7 +43,7 @@ export default defineContentScript({
       // Keep personal financial copy out of the retailer's ordinary DOM queries.
       const shadow = host.attachShadow({ mode: 'closed' });
       const style = document.createElement('style');
-      style.textContent = styles;
+      style.textContent = `${professorStyles}\n${styles}`;
       const dialog = document.createElement('dialog');
       dialog.setAttribute('aria-labelledby', 'pause-title');
       dialog.setAttribute('aria-describedby', 'pause-description');
@@ -104,17 +124,25 @@ export default defineContentScript({
     }, { capture: true });
 
     const onMessage = (message: unknown, sender: { id?: string }, respond: (response: unknown) => void) => {
-      if (sender.id !== browser.runtime.id || !message || typeof message !== 'object' || !('type' in message) || message.type !== 'shopping:open') return;
+      if (sender.id !== browser.runtime.id || !message || typeof message !== 'object' || !('type' in message)) return;
+      if (message.type === 'shopping:refresh-access') {
+        bypass = null;
+        closeActive?.();
+        void refreshAccess().then(() => respond({ ok: true, enabled }));
+        return true;
+      }
+      if (message.type !== 'shopping:open') return;
       if (isPaymentPage(new URL(location.href))) {
         respond({ error: 'Open a product or cart page. Checks do not run on payment or order pages.' });
         return;
       }
-      enabled = true;
+      manualActivation = true;
+      if (!paused) enabled = true;
       respond(active || show(readIntent(document, new URL(location.href), 'manual')) ? { ok: true } : { error: 'Could not open a check on this page. Refresh it and try again.' });
     };
     browser.runtime.onMessage.addListener(onMessage);
     ctx.addEventListener(window, 'wxt:locationchange', () => {
-      enabled = isAmazon(new URL(location.href));
+      void refreshAccess();
       bypass = null;
       closeActive?.();
     });

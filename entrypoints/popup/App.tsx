@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import './App.css';
 import { ShoppingHome } from './ShoppingHome';
+import { SiteAccess } from './SiteAccess';
+import { Professor } from '../../components/Professor';
+import { onboardingLines } from '../../lib/professorLines';
 
 type FinancialSituation = 'raise' | 'new-job' | 'improved' | 'no-change';
 
@@ -10,8 +13,30 @@ interface OnboardingData {
   trackingEnabled: boolean;
 }
 
+/** Unfinished setup stays separate from the preferences used by shopping checks. */
+interface OnboardingDraft {
+  step: 1 | 2 | 3;
+  situation: FinancialSituation | null;
+  monthlyIncomeIncrease: string;
+  trackingEnabled: boolean;
+}
+
+const emptyDraft: OnboardingDraft = { step: 1, situation: null, monthlyIncomeIncrease: '', trackingEnabled: true };
+
+/** Reject malformed drafts and steps that would bypass the required situation choice. */
+function readDraft(value: unknown): OnboardingDraft {
+  if (!value || typeof value !== 'object') return emptyDraft;
+  const draft = value as Record<string, unknown>;
+  const validSituation = typeof draft.situation === 'string' && ['raise', 'new-job', 'improved', 'no-change'].includes(draft.situation);
+  if (typeof draft.step !== 'number' || ![1, 2, 3].includes(draft.step)
+    || !(validSituation || (draft.step === 1 && draft.situation === null))
+    || typeof draft.monthlyIncomeIncrease !== 'string'
+    || typeof draft.trackingEnabled !== 'boolean') return emptyDraft;
+  return value as OnboardingDraft;
+}
+
 interface ChromeStorageArea {
-  get(keys: string, callback: (items: Record<string, unknown>) => void): void;
+  get(keys: string[], callback: (items: Record<string, unknown>) => void): void;
   set(items: Record<string, unknown>, callback: () => void): void;
 }
 
@@ -21,129 +46,152 @@ interface ChromeExtensionApi {
 }
 
 const STORAGE_KEY = 'onboarding';
+const DRAFT_KEY = 'onboardingDraft';
 const extensionChrome = (globalThis as typeof globalThis & { chrome: ChromeExtensionApi }).chrome;
 
 function App() {
   const [onboarding, setOnboarding] = useState<OnboardingData | null | undefined>();
+  const [draft, setDraft] = useState(emptyDraft);
+  const [loadError, setLoadError] = useState(false);
+  const [revision, setRevision] = useState(0);
 
   useEffect(() => {
     let settled = false;
     const timeout = window.setTimeout(() => {
-      if (!settled) setOnboarding(null);
+      if (!settled) setLoadError(true);
     }, 1000);
 
-    extensionChrome.storage.local.get(STORAGE_KEY, (stored) => {
-      settled = true;
+    extensionChrome.storage.local.get([STORAGE_KEY, DRAFT_KEY], (stored) => {
+      if (settled) return;
       window.clearTimeout(timeout);
       if (extensionChrome.runtime.lastError) {
-        setOnboarding(null);
+        setLoadError(true);
         return;
       }
+      setLoadError(false);
+      setDraft(readDraft(stored[DRAFT_KEY]));
       // An absent record means first-time setup, not an unfinished storage read.
       setOnboarding((stored[STORAGE_KEY] as OnboardingData | undefined) ?? null);
     });
 
-    return () => window.clearTimeout(timeout);
-  }, []);
+    return () => { settled = true; window.clearTimeout(timeout); };
+  }, [revision]);
 
-  if (onboarding === undefined) {
-    return <main className="app-shell loading" aria-label="Loading BruhImBroke"><div className="loading-mark">$</div><p>Checking your financial situation...</p></main>;
+  if (loadError) {
+    return <main className="home-shell loading"><p role="alert">Couldn’t load your saved setup.</p><button className="history-button" onClick={() => { setLoadError(false); setRevision((value) => value + 1); }}>Retry</button></main>;
   }
 
-  return onboarding ? <ShoppingHome /> : <Onboarding onComplete={setOnboarding} />;
+  if (onboarding === undefined) {
+    return <main className="home-shell loading" aria-label="Loading BruhImBroke"><div className="loading-mark">$</div><p>Loading...</p></main>;
+  }
+
+  return onboarding ? <ShoppingHome /> : <Onboarding initialDraft={draft} onComplete={setOnboarding} />;
 }
 
-function Onboarding({ onComplete }: { onComplete: (data: OnboardingData) => void }) {
-  const [step, setStep] = useState(1);
-  const [situation, setSituation] = useState<FinancialSituation | null>(null);
-  const [monthlyIncomeIncrease, setMonthlyIncomeIncrease] = useState('');
-  const [trackingEnabled, setTrackingEnabled] = useState(true);
+function Onboarding({ initialDraft, onComplete }: { initialDraft: OnboardingDraft; onComplete: (data: OnboardingData) => void }) {
+  const [draft, setDraft] = useState(initialDraft);
+  const [saving, setSaving] = useState(true);
+  const [saveError, setSaveError] = useState(false);
+  const { step, situation, monthlyIncomeIncrease, trackingEnabled } = draft;
 
-  const finish = async (tracking = trackingEnabled) => {
-    if (!situation) return;
+  useEffect(() => {
+    let active = true;
+    extensionChrome.storage.local.set({ [DRAFT_KEY]: draft }, () => {
+      const failed = Boolean(extensionChrome.runtime.lastError);
+      if (!active) return;
+      setSaveError(failed);
+      setSaving(false);
+    });
+    return () => { active = false; };
+  }, [draft]);
+
+  const updateDraft = (changes: Partial<OnboardingDraft>) => {
+    setSaving(true);
+    setSaveError(false);
+    setDraft((current) => ({ ...current, ...changes }));
+  };
+
+  const finish = (tracking = trackingEnabled) => {
+    if (!situation || saving || saveError) return;
+    setSaving(true);
 
     const data: OnboardingData = {
       situation,
       monthlyIncomeIncrease: monthlyIncomeIncrease ? Number(monthlyIncomeIncrease) : null,
       trackingEnabled: tracking,
     };
-    await new Promise<void>((resolve, reject) => {
-      extensionChrome.storage.local.set({ [STORAGE_KEY]: data }, () => {
-        const error = extensionChrome.runtime.lastError;
-        if (error) reject(error);
-        else resolve();
-      });
+    // Commit completion and clear the draft together, never before the save succeeds.
+    extensionChrome.storage.local.set({ [STORAGE_KEY]: data, [DRAFT_KEY]: null }, () => {
+      if (extensionChrome.runtime.lastError) {
+        setSaveError(true);
+        setSaving(false);
+        return;
+      }
+      onComplete(data);
     });
-    onComplete(data);
   };
 
   return (
-    <main className="app-shell onboarding-shell">
-      <header className="topbar">
-        <div className="brand-mark" aria-hidden="true">$</div>
-        <div>
-          <p className="eyebrow">Financial intervention unit</p>
-          <h1>BruhImBroke</h1>
+    <main className="home-shell onboarding-shell">
+      <header className="home-header">
+        <h1>BruhImBroke<span aria-hidden="true">.</span></h1>
+        <div className="onboarding-progress" aria-label={`Onboarding step ${step} of 3`}>
+          <span>{step} / 3</span>
+          <div aria-hidden="true">{[1, 2, 3].map((item) => <span className={item <= step ? 'active' : ''} key={item} />)}</div>
         </div>
       </header>
 
-      <div className="progress" aria-label={`Onboarding step ${step} of 3`}>
-        {[1, 2, 3].map((item) => <span className={item <= step ? 'active' : ''} key={item} />)}
+      <Professor mood="happy" dialogue={onboardingLines[step]} />
+
+      <div className="onboarding-panel">
+        {step === 1 && (
+          <section aria-labelledby="step-one-title">
+            <h2 id="step-one-title">Any money news?</h2>
+            <div className="choice-list">
+              <Choice label="Got a raise" selected={situation === 'raise'} onClick={() => updateDraft({ situation: 'raise' })} />
+              <Choice label="New, better-paying job" selected={situation === 'new-job'} onClick={() => updateDraft({ situation: 'new-job' })} />
+              <Choice label="Things improved" selected={situation === 'improved'} onClick={() => updateDraft({ situation: 'improved' })} />
+              <Choice label="No major change" selected={situation === 'no-change'} onClick={() => updateDraft({ situation: 'no-change' })} />
+            </div>
+            <button className="primary" type="button" disabled={!situation || saving || saveError} onClick={() => updateDraft({ step: 2 })}>Continue</button>
+          </section>
+        )}
+
+        {step === 2 && (
+          <section aria-labelledby="step-two-title">
+            <h2 id="step-two-title">Monthly income boost?</h2>
+            <p className="onboarding-caption">Take-home increase. Optional.</p>
+            <label className="money-input">
+              <span>$</span>
+              <input type="number" min="0" step="1" inputMode="numeric" placeholder="800" value={monthlyIncomeIncrease} onChange={(event) => updateDraft({ monthlyIncomeIncrease: event.target.value })} aria-label="Monthly take-home income increase" />
+              <small>USD / month</small>
+            </label>
+            <div className="actions step-actions">
+              <button className="primary" type="button" disabled={saving || saveError} onClick={() => updateDraft({ step: 3 })}>Continue</button>
+              <button className="secondary" type="button" disabled={saving || saveError} onClick={() => updateDraft({ monthlyIncomeIncrease: '', step: 3 })}>Skip for now</button>
+            </div>
+          </section>
+        )}
+
+        {step === 3 && (
+          <section className="onboarding-final" aria-labelledby="step-three-title">
+            <h2 id="step-three-title">Your call.</h2>
+            <button className={`tracking-choice ${trackingEnabled ? 'selected' : ''}`} type="button" aria-pressed={trackingEnabled} disabled={saving} onClick={() => updateDraft({ trackingEnabled: !trackingEnabled })}>
+              <span><strong>Save shopping history</strong><small>Log purchases on your final confirmation</small></span>
+              <span className="choice-check">{trackingEnabled ? 'ON' : 'OFF'}</span>
+            </button>
+            <p className="onboarding-caption">Saved before checkout completes. Edit or delete anytime.</p>
+            {!saving && !saveError && <SiteAccess onboarding />}
+            <div className="actions step-actions">
+              <button className="primary" type="button" disabled={saving || saveError} onClick={() => finish()}>Finish setup</button>
+              <button className="secondary" type="button" disabled={saving || saveError} onClick={() => finish(false)}>Skip tracking</button>
+            </div>
+          </section>
+        )}
+
+        {saveError && <div role="alert"><p className="error">Couldn’t save setup. Keep this popup open and retry.</p><button className="history-button" onClick={() => updateDraft({})}>Retry save</button></div>}
+        <p className="privacy-note">Stored only in your browser.</p>
       </div>
-
-      {step === 1 && (
-        <section className="onboarding-card" aria-labelledby="step-one-title">
-          <div className="onboarding-emoji" aria-hidden="true">🤑</div>
-          <p className="eyebrow warning">STEP 1 OF 3</p>
-          <h2 id="step-one-title">Did your money situation change?</h2>
-          <p className="message">No judgment. We just need enough context to make the jokes land.</p>
-          <div className="choice-list">
-            <Choice label="I got a raise" selected={situation === 'raise'} onClick={() => setSituation('raise')} />
-            <Choice label="I started a better-paying job" selected={situation === 'new-job'} onClick={() => setSituation('new-job')} />
-            <Choice label="Things generally improved" selected={situation === 'improved'} onClick={() => setSituation('improved')} />
-            <Choice label="No major change" selected={situation === 'no-change'} onClick={() => setSituation('no-change')} />
-          </div>
-          <button className="primary" type="button" disabled={!situation} onClick={() => setStep(2)}>Continue</button>
-        </section>
-      )}
-
-      {step === 2 && (
-        <section className="onboarding-card" aria-labelledby="step-two-title">
-          <div className="onboarding-emoji" aria-hidden="true">💸</div>
-          <p className="eyebrow warning">STEP 2 OF 3</p>
-          <h2 id="step-two-title">How much did your monthly take-home income increase?</h2>
-          <p className="message">Optional. A rough number is plenty. We do not need your salary, bank login, or tax returns.</p>
-          <label className="money-input">
-            <span>$</span>
-            <input type="number" min="0" step="1" inputMode="numeric" placeholder="800" value={monthlyIncomeIncrease} onChange={(event) => setMonthlyIncomeIncrease(event.target.value)} aria-label="Monthly take-home income increase" />
-            <small>per month</small>
-          </label>
-          <div className="actions step-actions">
-            <button className="primary" type="button" onClick={() => setStep(3)}>Continue</button>
-            <button className="secondary" type="button" onClick={() => { setMonthlyIncomeIncrease(''); setStep(3); }}>Skip for now</button>
-          </div>
-        </section>
-      )}
-
-      {step === 3 && (
-        <section className="onboarding-card" aria-labelledby="step-three-title">
-          <div className="onboarding-emoji" aria-hidden="true">🧾</div>
-          <p className="eyebrow warning">STEP 3 OF 3</p>
-          <h2 id="step-three-title">Want help spotting the pattern?</h2>
-          <p className="message">Your final “Log my purchase” confirmation saves a purchase immediately, even before checkout finishes. If you change your mind, edit or delete it in Shopping history. Everything stays on this device.</p>
-          <button className={`tracking-choice ${trackingEnabled ? 'selected' : ''}`} type="button" aria-pressed={trackingEnabled} onClick={() => setTrackingEnabled((enabled) => !enabled)}>
-            <span className="choice-icon">✓</span>
-            <span><strong>Save shopping history</strong><small>Log purchases on your final confirmation</small></span>
-            <span className="choice-check">{trackingEnabled ? 'ON' : 'OFF'}</span>
-          </button>
-          <div className="actions step-actions">
-            <button className="primary" type="button" onClick={() => void finish()}>Finish setup</button>
-            <button className="secondary" type="button" onClick={() => void finish(false)}>Skip tracking</button>
-          </div>
-        </section>
-      )}
-
-      <p className="privacy-note">🔒 Stored locally in Chrome</p>
     </main>
   );
 }
