@@ -1,164 +1,141 @@
 # BruhImBroke
 
-Your wallet's last line of defense against yourself.
+Your wallet’s last line of defense against yourself.
 
-This Chrome extension uses WXT, React, and TypeScript. It includes onboarding,
-shopping interventions, immediate purchase logging on the final confirmation,
-and editable local purchase history. No server or account is required.
+I built a Chrome extension for my HON 410 class. This is to add friction to impulse purchases and general spending. The whole point is that if I get a raise, I shouldn’t immediately increase my spending by the same amount and cancel out the chance to build wealth.
 
-## Run locally
+Basically, making more money shouldn’t just mean giving more money to Amazon and Chipotle.
+
+Instead of another budgeting dashboard I’ll forget to check, a slightly judgmental professor shows up when I try to buy something. He gives me a second to think, shows what the purchase would do to my spending, and makes a comment I probably didn’t ask for.
+
+You can still buy it. That’s the point: a pause, not a ban on spending.
+
+## Try it locally
+
+You’ll need Chrome, Node.js, and npm. From this project’s folder:
 
 ```bash
 npm install
-npm run dev
+npm run build
 ```
 
-WXT opens Chrome with the unpacked extension loaded. Click the extension icon
-to preview the popup. For a production build, run `npm run build`, then load
-`.output/chrome-mv3` from `chrome://extensions` with Developer mode enabled.
+1. Open `chrome://extensions` in Chrome.
+2. Turn on **Developer mode** in the top right.
+3. Click **Load unpacked** and select this project’s `.output/chrome-mv3` folder.
+4. Pin BruhImBroke from Chrome’s extensions menu, then click its icon.
 
-After rebuilding, reload the extension **and refresh existing retailer tabs**.
-The build folder is `.output/chrome-mv3`; `npm run dev` uses
-`.output/chrome-mv3-dev`. Keep the dev server running if you load the dev folder.
+On macOS, press **Cmd + Shift + .** in the folder picker if `.output` is hidden.
 
-## Try the shopping flow
+After code changes, run `npm run build` again, reload the extension at `chrome://extensions`, and refresh any shopping tabs that were already open. Reloading alone does not rebuild the code.
 
-After onboarding, the landscape dashboard shows the professor on the left and
-monthly shopping metrics on the right. Totals and expressions update when local
-history changes, including corrections and deletions.
-Use **History & tools** in the header to access all existing history controls
-and **Check this page**. The header control becomes an **X** while open; click it
-or press Escape to close. Compact rows keep the product, store, date, and price
-together, with inline edit/delete actions. Reminders are grouped under **To confirm**.
-Product thumbnails are omitted for now to avoid extra remote image requests.
+## How it works, step by step
 
-### Dashboard calculations
+These are screenshots of the current extension using fictional local test data. The shopping screens use a test storefront, not a real order. There’s no built-in demo mode yet.
 
-- **Logged this month:** sum of purchase amounts in the current local calendar
-  month and year. Calculations use integer cents; unconfirmed reminders do not count.
-- **Purchases logged:** count of those same records.
-- **Income comparison:** monthly logged total divided by the optional monthly
-  take-home income increase, multiplied by 100. Invalid or missing income hides
-  the comparison; it never substitutes zero or guesses an income.
-- **Professor:** happy below 50%, questionable from 50% to under 100%, sad at
-  100% or more. These are playful product thresholds, not financial advice.
-  Zero logged spending with an income increase set is happy at 0%.
-  Missing income, tracking off, and read errors keep him neutral
-  using the questionable sprite. The exact ratio drives the mood; displayed
-  percentages round to one decimal place. Percentages can exceed 100%, while
-  the visual bar stops at full width.
+### 1. Tell the professor what changed
 
-Tracking off keeps previously saved totals visible and labels them accordingly.
-The calendar refreshes each minute while the popup is open. Existing prices may
-be estimates, and logging does not verify checkout completion. The ratio is not
-a budget, remaining balance, or claim that this share of a raise was lost to
-lifestyle inflation. That would require comparable before/after history.
+Got a raise, started a better-paying job, or just doing better financially? Pick the option that fits. **No major change** works too. We’re not connecting to your bank.
 
-1. Complete onboarding. Enable shopping history to save purchases and reminders.
-2. Refresh an Amazon.com product page and click its main **Add to Cart** or
-   **Buy Now** button. The cart's **Proceed to checkout** control is also covered.
-3. The landscape professor dialog pauses that click. Check or correct the product and total.
-   Prices are USD estimates, including the detected quantity but not necessarily
-   tax, shipping, or discounts. Unknown or conflicting prices require manual entry.
-   The preview adds this one-time total to this month's logged spending and uses
-   the good-purchase sprite below 50% or bad-purchase sprite at 50% and above.
-   Insisting on a bad purchase switches to the reconsider sprite. The exact,
-   unrounded percentage controls this; dashboard expressions are unchanged.
-   Editing the price or updating history refreshes the projection and sprite;
-   previewing never logs a purchase. Unknown prices, missing income, or disabled
-   tracking keep him neutral. On narrow windows, the layout stacks and scrolls.
-4. **I'll reconsider**, the close button, or Escape dismisses the check without
-   performing the shopping action. **I'm buying it anyway** reveals the final
-   **RIP wallet. Log my purchase.** choice. With tracking on, this immediately
-   records the displayed total as a purchase and counts it toward spending.
-   It assumes you will buy; checkout completion is not verified. Then click the
-   same retailer button again within 30 seconds. Only that next click bypasses
-   the intervention. Tracking off saves nothing and changes the final button to
-   **RIP wallet. I'm buying it.** Missing or invalid prices require a valid USD
-   total before logging; you can also **Continue without saving**. If saving
-   fails, retry or explicitly continue without saving, then check history.
-5. Open the popup's **Shopping history** to see the purchase immediately, with no
-   second confirmation needed. **Edit entry** corrects the product, store, amount,
-   date, and purchase status. **Delete entry** removes it if you decide not to buy.
-   Optional **Save reminder** on the first screen still saves an
-   unconfirmed reminder. Existing reminders and older unconfirmed attempts remain
-   unconfirmed until you explicitly confirm them. They do not count as spending.
-6. Use **Clear saved shopping data** to remove attempts, reminders, and purchases.
-   Never confirm both a cart and the individual items already included in it.
+![First onboarding step with financial situation choices and the professor’s thought bubble](docs/screenshots/01-situation.png)
 
-### Approve once, then shop
+### 2. Enter the extra monthly income, if you want
 
-Step 3 of onboarding offers **Enable automatic checks**. It requests Chrome's
-permission for all HTTP and HTTPS websites once, with no per-store approval.
-Existing users can find the same button in **History & tools → Automatic checks**.
-The current tab is activated too. Refresh other already-open shopping tabs once;
-future visits get the listener automatically, including after browser restarts.
-Permission is optional: finishing onboarding never silently requests it, and
-denying the request does not block setup, history, or manual checks.
+This is your monthly **take-home increase**, not your whole salary. If you now take home $800 more each month, enter `800`. You can also skip it and still use the shopping checks and history.
 
-Use **Pause on this site** or **Resume on this site** in that panel to stop or
-restore interruptions on one exact hostname, across HTTP and HTTPS. Pauses persist
-locally and update already-open listeners, including Amazon. They do not revoke
-Chrome's access permission or delete purchase history. To revoke broad access,
-use Chrome's extension site-access settings. Older individual site approvals
-remain usable until the user opts into the new broad permission.
+![Second onboarding step with an example monthly take-home increase of 800 dollars](docs/screenshots/02-income.png)
 
-**Check this page** remains available without persistent permission. It opens a
-manual intervention and enables button checks only until navigation/reload.
-On a paused site, it opens just the manual check without undoing the pause.
-Other sites' prices are entered manually. Neither mode verifies a completed order.
+### 3. Choose history and automatic checks
 
-## Coverage and limits
+Choose whether to save shopping history. Click **Enable automatic checks** if you want the extension to watch for shopping buttons across websites. Chrome asks for website access once, rather than making you approve every store.
 
-- Automatic: Amazon.com desktop product and cart controls. Not every Amazon
-  experiment, recommendation card, subscription, or mobile layout is covered.
-- eBay.com after website approval: Buy It Now and Add to cart on `/itm/` listings.
-  Bids, offers, and eBay checkout are excluded. Price entry is manual; detection
-  is fixture-tested against documented wording, not a live-checkout guarantee.
-- Other enabled or manually activated sites: common exact English labels such
-  as Add to cart, Add to bag, Buy it now, and Checkout. A product/cart URL or
-  nearby product/cart markup is also required. Dynamic buttons are covered by
-  the delegated click listener. False negatives are intentional where context
-  is unclear; use **Check this page**. This is not universal retailer support.
-  Whole URL segments such as `shop`, `store`, `item(s)`, `collection(s)`, and
-  `catalog`/`catalogue` now count alongside `product(s)`, `p`, and `dp`.
-- Payment/order pages and final payment buttons are not intercepted. No order
-  is submitted, checkout form altered, or payment data read. Purchase logging is
-  based on the user's final confirmation, not proof of completed checkout.
-- Embedded payment frames, closed retailer shadow roots, direct form submissions,
-  and sites that act on pointer-down rather than click are outside coverage.
-- Insights use confirmed purchases recorded this calendar month and optional
-  monthly income increase. They do not claim a spending trend or a before/after
-  raise comparison. Fictional demo history is not implemented in this flow.
-- Preferences use the existing `onboarding` key. Older attempts and explicit reminders use
-  `reminder:<id>` and confirmed purchases use `purchase:<id>` in Chrome local
-  storage. Paused hostnames use `shoppingPausedHosts`, separate from history.
-  Nothing is sent to a backend. Broad access enables local click detection,
-  not browsing-history collection or payment-field reading.
+That permission is optional. Without it, **History & tools → Check this page** is the manual fallback. Amazon.com also has built-in checks.
 
-## Checks
+If the popup closes during the permission prompt, just reopen it. Your step and answers are saved. Click **Finish setup** when you’re ready.
+
+![Final onboarding step with shopping history preferences and the automatic checks button](docs/screenshots/03-permissions.png)
+
+### 4. See where your shopping stands
+
+The main screen shows what you’ve logged this month, how many purchases you’ve logged, and how that total compares with your extra monthly income. The professor changes expressions as the percentage goes up.
+
+In this example, $320 of logged shopping compared with an $800 monthly income increase is **40%**.
+
+![Dashboard showing 320 dollars of monthly shopping, a 40 percent comparison, and a happy professor](docs/screenshots/04-dashboard.png)
+
+### 5. Try to buy something
+
+Click a recognized **Add to Cart**, **Add to Bag**, **Buy Now**, or checkout button on a supported shopping page. The professor interrupts that click and shows what the purchase would do to the percentage.
+
+Check the product and total. Amazon prices can be detected, but they’re still estimates. Other stores currently need a manually entered USD total.
+
+Here, a potential $480 purchase would take the example from $320 to $800, or **40% to 100%**. Nothing has been logged yet.
+
+![Shopping interruption showing a 480 dollar purchase taking the comparison from 40 to 100 percent](docs/screenshots/05-intervention.png)
+
+Below 50%, you get the good-purchase professor. At 50% or above, you get the bad-purchase reaction. These are joke thresholds, not a verdict on whether you can afford something.
+
+### 6. Reconsider, or overrule him
+
+**I’ll reconsider**, the **X**, or Escape closes the interruption without carrying out the shopping click.
+
+If you choose **I’m buying it anyway**, you get one last confirmation. For a higher-impact purchase, the professor switches to his reconsider expression.
+
+![Final confirmation with the reconsidering professor and the RIP wallet Log my purchase button](docs/screenshots/06-confirmation.png)
+
+With tracking on, **RIP wallet. Log my purchase.** records the purchase immediately. We assume you’re going through with it. The extension does **not** verify that checkout finished or place the order for you.
+
+Then click the same store button again within 30 seconds. That one click goes through without another interruption. With tracking off, the final button lets you proceed without logging anything.
+
+### 7. Fix anything in history
+
+Open **History & tools** to see what you’ve logged. If you changed your mind after confirming, delete the entry. If the amount or product was wrong, edit it. The dashboard updates with those changes.
+
+![Shopping history showing fictional purchases with edit and delete controls](docs/screenshots/07-history.png)
+
+You can correct the product, store, amount, date, and status right there. **Save reminder** entries stay under **To confirm** and don’t count as spending until confirmed.
+
+![Inline history editor for correcting a fictional purchase](docs/screenshots/08-edit-history.png)
+
+Use the **X** to return to the dashboard. **Clear saved shopping data** removes purchases and reminders after confirmation, without resetting onboarding. Don’t log both individual items and the cart containing those same items, or they’ll count twice.
+
+## What the percentage actually means
+
+```text
+This month’s logged shopping ÷ monthly take-home income increase × 100
+
+$320 ÷ $800 × 100 = 40%
+```
+
+At 100%, the shopping you’ve logged this month equals the extra income you entered. It doesn’t mean your bank balance is zero or that you’ve spent your whole salary.
+
+| Dashboard percentage | Professor |
+| --- | --- |
+| Below 50% | Happy |
+| 50% to below 100% | Questionable |
+| 100% or more | Sad |
+
+Without an income increase, or with tracking off, he stays neutral. The percentage can go above 100%, even though the visual bar stops at full width.
+
+The goal is to make lifestyle inflation harder to ignore. But this version compares **total logged shopping** with your income increase. It doesn’t compare spending before and after your raise, so it can’t prove how much of that raise you’ve actually spent on lifestyle upgrades. It’s a reality check, not a full financial picture.
+
+## Privacy and current limits
+
+- Everything is local to your Chrome profile: preferences, unfinished onboarding, purchases, reminders, and paused sites. No account, backend, or bank connection.
+- It doesn’t read payment details, submit orders, or secretly confirm purchases. Logging happens when you explicitly choose the final confirmation.
+- Amazon.com is the main target. Other stores use common button wording and shopping-page context, so some sites or layouts will be missed. Use **Check this page** when that happens.
+- Website access enables local shopping checks. You can pause a specific site in **History & tools → Automatic checks**, or revoke access through Chrome’s extension settings.
+- Prices are USD estimates. Check quantity, discounts, tax, and shipping yourself. Missing prices need manual entry.
+
+## Development
+
+Built with **WXT, React, TypeScript, CSS, Chrome local storage, and Manifest V3**. No server required.
 
 ```bash
-npm test
-npm run compile
+npm run dev      # Start development mode and open Chrome
+npm run compile  # TypeScript checks
+npm test         # Build and run the test suite
 ```
 
-Tests exercise the production popup/content bundles with simulated Chrome APIs
-and synthetic retailer markup. They cover first launch, prices, continuation,
-immediate purchase logging, manual corrections, confirmation, deletion, tracking
-opt-out, exclusions, and storage failures. The production worker is also tested
-for persistent registration, broad and legacy permissions, onboarding denial,
-permission revocation, retry after failure, sender validation, persistent pauses,
-and already-open tab deactivation.
-Native modal, focus containment, Escape, and real mouse continuation were also
-smoke-tested in isolated Chrome on a local fixture, with simulated storage.
-The 720 × 460 main menu, sprite loading, live metric-driven expressions, tools panel bounds,
-and Escape navigation were also checked in isolated Chrome with simulated storage.
-The loaded extension's onboarding approval button, broad dynamic registration,
-reload/new-tab activation, pause/resume, and revocation were checked in isolated
-Chrome against a local mock store. Permissions were preapproved in that test
-profile; the native approval dialog still needs manual verification. The actual
-2degreecelsius Core Zip Up page also opened the modal on Add to cart with broad
-access, while non-GET requests were blocked. No live checkout was completed.
+Development mode uses `.output/chrome-mv3-dev`; keep the dev server running. The regular build uses `.output/chrome-mv3`.
 
-See [retailer research and selector decisions](docs/retailer-notes.md).
+For detection details, storage keys, and testing limitations, see the [technical notes](docs/technical-notes.md) and [retailer notes](docs/retailer-notes.md).
